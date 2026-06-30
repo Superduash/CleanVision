@@ -1,4 +1,12 @@
 # ─────────────────────────────────────────────
+# Training data (local sample images — not tracked)
+# ─────────────────────────────────────────────
+data/clean/*
+!data/clean/.gitkeep
+data/dirty/*
+!data/dirty/.gitkeep
+
+# ─────────────────────────────────────────────
 # Node / Frontend
 # ─────────────────────────────────────────────
 node_modules/
