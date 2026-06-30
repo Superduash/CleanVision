@@ -79,6 +79,10 @@ Desktop.ini
 # Export script output
 # ─────────────────────────────────────────────
 Complete_Project_Code.txt
+export.py
+
+# Internal build/dev prompts
+CLEANVISION_BUILD_PROMPT.md
 
 # ─────────────────────────────────────────────
 # Caches & misc
