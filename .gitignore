@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/venv/
+
+# Build output
+frontend/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+
+# Database
+backend/database.db
+
+# Uploaded files (keep .gitkeep)
+backend/uploads/baselines/*
+!backend/uploads/baselines/.gitkeep
+backend/uploads/scans/*
+!backend/uploads/scans/.gitkeep
+
+# Model file (not tracked, downloaded separately)
+backend/cleanliness_model.h5
+
+# Environment
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Colab downloads
+/content/
