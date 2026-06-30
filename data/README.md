@@ -2,8 +2,8 @@
 
 Place your training images here:
 
-- `clean/` — Images of clean hospital rooms (label: 1.0)
-- `dirty/` — Images of dirty hospital rooms (label: 0.0)
+- `clean/` — Images of clean hospital rooms (label: 0)
+- `dirty/` — Images of dirty hospital rooms (label: 1)
 
 ## Guidelines
 
