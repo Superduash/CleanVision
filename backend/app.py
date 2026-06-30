@@ -241,9 +241,16 @@ def serve_upload(filename):
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_react(path):
-    """Serve the built React app for any non-API route."""
-    if path and os.path.exists(os.path.join(FRONTEND_BUILD, path)):
-        return send_from_directory(FRONTEND_BUILD, path)
+    """Serve the built React app for any non-API route (production mode)."""
+    # Serve any static asset that physically exists inside the build folder
+    if path:
+        target = os.path.normpath(os.path.join(FRONTEND_BUILD, path))
+        # Guard against path traversal
+        if target.startswith(os.path.normpath(FRONTEND_BUILD)) and os.path.isfile(target):
+            directory = os.path.dirname(target)
+            filename  = os.path.basename(target)
+            return send_from_directory(directory, filename)
+    # For all React Router paths (and root), serve index.html
     index_path = os.path.join(FRONTEND_BUILD, "index.html")
     if os.path.exists(index_path):
         return send_from_directory(FRONTEND_BUILD, "index.html")
