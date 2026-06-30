@@ -1,61 +1,103 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { getStatusLabel, getStatusTextClass } from '../utils/status';
 
-function getGaugeColor(status) {
-  if (status === 'clean') return { ring: 'text-green-500', bg: 'bg-green-50', text: 'text-green-700' };
-  if (status === 'needs_attention') return { ring: 'text-amber-500', bg: 'bg-amber-50', text: 'text-amber-700' };
-  if (status === 'dirty') return { ring: 'text-red-500', bg: 'bg-red-50', text: 'text-red-700' };
-  return { ring: 'text-gray-400', bg: 'bg-gray-50', text: 'text-gray-600' };
-}
-
-function getStatusLabel(status) {
-  if (status === 'clean') return 'Clean';
-  if (status === 'needs_attention') return 'Needs Attention';
-  if (status === 'dirty') return 'Dirty';
-  return 'Unknown';
-}
-
+/**
+ * ScoreGauge — circular SVG gauge showing the cleanliness score.
+ *
+ * Props:
+ *   score   — number 0–100
+ *   status  — 'clean' | 'needs_attention' | 'dirty'
+ */
 function ScoreGauge({ score, status }) {
-  const colors = getGaugeColor(status);
-  const radius = 70;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (score / 100) * circumference;
-  const offset = circumference - progress;
+  const circleRef = useRef(null);
+
+  const RADIUS       = 72;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const targetOffset  = CIRCUMFERENCE - (score / 100) * CIRCUMFERENCE;
+
+  // Animate stroke-dashoffset from full (hidden) → target value
+  useEffect(() => {
+    const circle = circleRef.current;
+    if (!circle) return;
+
+    // Start fully hidden, then transition to target
+    circle.style.transition = 'none';
+    circle.style.strokeDashoffset = String(CIRCUMFERENCE);
+
+    // Force a reflow so the browser registers the starting state
+    void circle.getBoundingClientRect();
+
+    // Animate
+    circle.style.transition = 'stroke-dashoffset 1s cubic-bezier(0.4,0,0.2,1)';
+    circle.style.strokeDashoffset = String(targetOffset);
+  }, [score, targetOffset, CIRCUMFERENCE]);
+
+  // Stroke colour by status
+  const strokeColor =
+    status === 'clean'           ? '#10b981' :
+    status === 'needs_attention' ? '#f59e0b' :
+    status === 'dirty'           ? '#ef4444' :
+                                   '#374151';
+
+  // Glow filter id (unique per status to avoid cross-contamination)
+  const filterId = `glow-${status}`;
+
+  const textColor = getStatusTextClass(status);
 
   return (
-    <div className="flex flex-col items-center justify-center py-6">
-      <div className="relative w-48 h-48">
-        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
-          {/* Background circle */}
+    <div className="flex flex-col items-center justify-center py-4 animate-fade-in">
+      <div className="relative w-52 h-52">
+        <svg
+          className="w-full h-full"
+          viewBox="0 0 160 160"
+          aria-label={`Cleanliness score: ${score} out of 100. Status: ${getStatusLabel(status)}`}
+        >
+          <defs>
+            <filter id={filterId} x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* Track */}
           <circle
-            cx="80"
-            cy="80"
-            r={radius}
+            cx="80" cy="80" r={RADIUS}
             fill="none"
-            stroke="#e5e7eb"
+            stroke="rgba(255,255,255,0.06)"
             strokeWidth="12"
           />
-          {/* Progress circle */}
+
+          {/* Progress arc — starts at top (−90° rotation applied via transform) */}
           <circle
-            cx="80"
-            cy="80"
-            r={radius}
+            ref={circleRef}
+            cx="80" cy="80" r={RADIUS}
             fill="none"
-            className={colors.ring}
-            stroke="currentColor"
+            stroke={strokeColor}
             strokeWidth="12"
             strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={CIRCUMFERENCE}
+            transform="rotate(-90 80 80)"
+            filter={`url(#${filterId})`}
           />
         </svg>
-        {/* Score in center */}
+
+        {/* Centre content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={`text-4xl font-bold ${colors.text}`}>{score}</span>
-          <span className="text-sm text-gray-500">/ 100</span>
+          <span className={`text-5xl font-extrabold tabular-nums leading-none ${textColor}`}>
+            {score}
+          </span>
+          <span className="text-sm mt-1" style={{ color: '#8b949e' }}>
+            / 100
+          </span>
         </div>
       </div>
-      <p className={`mt-4 text-lg font-semibold ${colors.text}`}>
+
+      {/* Status label */}
+      <p className={`mt-3 text-lg font-semibold tracking-wide ${textColor}`}>
         {getStatusLabel(status)}
       </p>
     </div>

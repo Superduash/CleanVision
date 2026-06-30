@@ -1,84 +1,91 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_BASE from '../config';
 import ScoreGauge from '../components/ScoreGauge';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { buildImageUrl } from '../utils/status';
 
+/**
+ * ScanPage — upload a current photo of a room to get a cleanliness score.
+ */
 function ScanPage() {
-  const { roomId } = useParams();
-  const navigate = useNavigate();
+  const { roomId }  = useParams();
+  const navigate    = useNavigate();
   const fileInputRef = useRef(null);
-  const canvasRef = useRef(null);
 
-  const [room, setRoom] = useState(null);
-  const [baselineUrl, setBaselineUrl] = useState(null);
+  const [room,         setRoom]         = useState(null);
+  const [baselineUrl,  setBaselineUrl]  = useState(null);
+  const [roomLoading,  setRoomLoading]  = useState(true);
+  const [roomError,    setRoomError]    = useState(null);
+
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
+  const [previewUrl,   setPreviewUrl]   = useState(null);
+  const [dragging,     setDragging]     = useState(false);
+  const [scanning,     setScanning]     = useState(false);
+  const [result,       setResult]       = useState(null);
+  const [scanError,    setScanError]    = useState(null);
+
+  // --- Load room info ---
+  const fetchRoom = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_BASE}/rooms/${roomId}`);
+      const r   = res.data.room;
+      setRoom(r);
+      setBaselineUrl(buildImageUrl(r.baseline_image_path, API_BASE));
+    } catch {
+      setRoomError('Room not found or server unreachable.');
+    } finally {
+      setRoomLoading(false);
+    }
+  }, [roomId]);
 
   useEffect(() => {
     fetchRoom();
-  }, []);
+  }, [fetchRoom]);
 
-  const fetchRoom = async () => {
-    try {
-      const response = await axios.get(`${API_BASE}/rooms/${roomId}`);
-      if (response.data.room) {
-        setRoom(response.data.room);
-        // Build baseline image URL from the stored path
-        if (response.data.room.baseline_image_path) {
-          // The API base is '/api', so the origin is the base of that
-          const apiOrigin = API_BASE.replace('/api', '');
-          setBaselineUrl(`${apiOrigin}/${response.data.room.baseline_image_path}`);
-        }
-      }
-    } catch (err) {
-      setError('Failed to load room information.');
-      console.error('Error fetching room:', err);
-    }
-  };
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
+  // --- File handling ---
+  const handleFile = useCallback((file) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file.');
+      setScanError('Please select an image file (jpg, jpeg, png, or webp).');
       return;
     }
     setSelectedFile(file);
     setPreviewUrl(URL.createObjectURL(file));
-    setError(null);
+    setScanError(null);
     setResult(null);
+  }, []);
+
+  const handleFileInput = (e) => handleFile(e.target.files[0]);
+  const onDragOver  = (e) => { e.preventDefault(); setDragging(true);  };
+  const onDragLeave = ()  => setDragging(false);
+  const onDrop      = (e) => {
+    e.preventDefault();
+    setDragging(false);
+    handleFile(e.dataTransfer.files[0]);
   };
 
+  // --- Scan ---
   const handleScan = async () => {
     if (!selectedFile) {
-      setError('Please select an image first.');
+      setScanError('Please select an image first.');
       return;
     }
-
-    setUploading(true);
-    setError(null);
+    setScanning(true);
+    setScanError(null);
     setResult(null);
 
     try {
-      const formData = new FormData();
-      formData.append('room_id', roomId);
-      formData.append('image', selectedFile);
-
-      const response = await axios.post(`${API_BASE}/scan`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      setResult(response.data);
+      const form = new FormData();
+      form.append('room_id', roomId);
+      form.append('image', selectedFile);
+      const res = await axios.post(`${API_BASE}/scan`, form);
+      setResult(res.data);
     } catch (err) {
-      const msg = err.response?.data?.error || 'Scan failed. Please try again.';
-      setError(msg);
+      setScanError(err.response?.data?.error || 'Scan failed. Please try again.');
     } finally {
-      setUploading(false);
+      setScanning(false);
     }
   };
 
@@ -86,116 +93,208 @@ function ScanPage() {
     setSelectedFile(null);
     setPreviewUrl(null);
     setResult(null);
-    setError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setScanError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- Loading / error states for room ---
+  if (roomLoading) return <LoadingSpinner label="Loading room…" />;
+
+  if (roomError) {
+    return (
+      <div className="max-w-lg mx-auto animate-fade-in">
+        <div className="cv-card p-8 text-center">
+          <p className="text-4xl mb-4">🚫</p>
+          <p className="text-sm mb-4" style={{ color: '#8b949e' }}>{roomError}</p>
+          <button id="back-from-error" className="cv-btn-secondary" onClick={() => navigate('/')}>
+            ← Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="max-w-2xl mx-auto animate-fade-in">
+      {/* Page header */}
+      <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Scan Room</h2>
-          {room && <p className="text-sm text-gray-500">{room.name} — Block {room.block}</p>}
+          <h1 className="cv-page-title">Scan Room</h1>
+          {room && (
+            <p className="text-sm mt-0.5" style={{ color: '#8b949e' }}>
+              {room.name} — Block {room.block}
+            </p>
+          )}
         </div>
         <button
+          id="scan-back-btn"
+          className="cv-back-btn mt-1"
           onClick={() => navigate('/')}
-          className="text-gray-500 hover:text-gray-700 text-sm no-underline"
         >
-          ← Back
+          ← Dashboard
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm">
-          {error}
-          <button onClick={() => setError(null)} className="ml-2 font-bold">×</button>
-        </div>
-      )}
-
-      {/* Result View */}
-      {result && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <ScoreGauge score={result.score} status={result.status} />
-
-          {/* Dirty alert banner */}
-          {result.status === 'dirty' && (
-            <div className="bg-red-100 border border-red-400 text-red-800 px-4 py-4 rounded-md mb-4 flex items-center">
-              <span className="text-xl mr-2">⚠️</span>
-              <span className="font-bold">ALERT: Area requires cleaning</span>
-            </div>
-          )}
-
-          {/* Mock prediction badge */}
-          {result.mock && (
-            <div className="bg-yellow-100 border border-yellow-300 text-yellow-800 px-3 py-2 rounded-md mb-4 text-sm text-center">
-              🔧 Mock prediction — model not yet trained
-            </div>
-          )}
-
-          {/* Uploaded photo preview */}
-          {previewUrl && (
-            <div className="mt-4">
-              <img src={previewUrl} alt="Scanned image" className="w-full rounded-md max-h-64 object-cover" />
-            </div>
-          )}
-
+      {/* Scan error */}
+      {scanError && (
+        <div className="cv-alert-error mb-4 flex items-center justify-between">
+          <span>{scanError}</span>
           <button
-            onClick={handleNewScan}
-            className="w-full mt-6 bg-emerald-600 text-white py-3 rounded-md font-medium hover:bg-emerald-700 transition-colors"
+            onClick={() => setScanError(null)}
+            style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: 0, marginLeft: '0.5rem' }}
+            aria-label="Dismiss error"
           >
-            New Scan
+            ×
           </button>
         </div>
       )}
 
-      {/* Scan View (no result yet) */}
-      {!result && (
-        <div className="space-y-6">
-          {/* Baseline image display */}
-          {baselineUrl && (
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Baseline (Clean Reference)</h3>
-              <img src={baselineUrl} alt="Baseline" className="w-full rounded-md max-h-64 object-cover" />
+      {/* RESULT VIEW */}
+      {result && (
+        <div className="cv-card p-6 mb-6 animate-fade-in">
+          <ScoreGauge score={result.score} status={result.status} />
+
+          {/* Dirty alert */}
+          {result.status === 'dirty' && (
+            <div className="cv-dirty-banner my-4">
+              <span className="text-2xl">⚠️</span>
+              <span>ALERT: This area requires immediate cleaning</span>
             </div>
           )}
 
-          {/* Scan input */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Upload current room photo
-              </label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileSelect}
-                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+          {/* Mock badge */}
+          {result.mock && (
+            <div className="cv-alert-warning my-4 text-sm text-center">
+              🔧 Mock prediction — real model not yet trained
+            </div>
+          )}
+
+          {/* Scanned image preview */}
+          {previewUrl && (
+            <div className="mt-4 rounded-xl overflow-hidden">
+              <img
+                src={previewUrl}
+                alt="Scanned room"
+                className="w-full max-h-64 object-cover"
               />
             </div>
+          )}
 
-            {/* Preview */}
-            {previewUrl && (
-              <div className="mb-4">
-                <img src={previewUrl} alt="Preview" className="w-full rounded-md max-h-64 object-cover" />
-              </div>
-            )}
-
-            {/* Scan Now button */}
+          <div className="flex gap-3 mt-6">
             <button
-              onClick={handleScan}
-              disabled={!selectedFile || uploading}
-              className="w-full bg-emerald-600 text-white py-3 rounded-md text-lg font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              id="new-scan-btn"
+              className="cv-btn-primary flex-1"
+              onClick={handleNewScan}
             >
-              {uploading ? (
-                <span className="flex items-center justify-center">
-                  <LoadingSpinner label="Analyzing..." />
-                </span>
+              New Scan
+            </button>
+            <button
+              id="view-history-btn"
+              className="cv-btn-secondary flex-1"
+              onClick={() => navigate(`/history/${roomId}`)}
+            >
+              View History
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* SCAN INPUT VIEW */}
+      {!result && (
+        <div className="space-y-5">
+          {/* Baseline reference */}
+          {baselineUrl && (
+            <div className="cv-card p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#8b949e' }}>
+                Baseline — Clean Reference
+              </p>
+              <div className="rounded-xl overflow-hidden">
+                <img
+                  src={baselineUrl}
+                  alt="Baseline clean reference"
+                  className="w-full max-h-56 object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Upload zone */}
+          <div className="cv-card p-6">
+            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: '#8b949e' }}>
+              Current Room Photo
+            </p>
+
+            <div
+              className={`cv-dropzone mb-4 ${dragging ? 'active' : ''}`}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              onClick={() => !scanning && fileInputRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              aria-label="Upload scan image"
+              onKeyDown={(e) => e.key === 'Enter' && !scanning && fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                id="scan-image-input"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                capture="environment"
+                onChange={handleFileInput}
+                className="hidden"
+                disabled={scanning}
+              />
+
+              {previewUrl ? (
+                <div className="space-y-2">
+                  <img
+                    src={previewUrl}
+                    alt="Preview of selected scan"
+                    className="mx-auto rounded-lg max-h-48 object-cover"
+                  />
+                  <p className="text-xs" style={{ color: '#8b949e' }}>
+                    Click to replace
+                  </p>
+                </div>
               ) : (
-                '🔍 Scan Now'
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <p className="text-sm" style={{ color: '#8b949e' }}>
+                    <span className="font-semibold" style={{ color: '#10b981' }}>Click to upload</span> or drag & drop
+                  </p>
+                  <p className="text-xs" style={{ color: '#6b7280' }}>
+                    JPG, JPEG, PNG, WEBP — max 16 MB
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Scan button */}
+            <button
+              id="scan-now-btn"
+              onClick={handleScan}
+              disabled={!selectedFile || scanning}
+              className="cv-btn-primary w-full text-base py-3"
+              style={{ fontSize: '1rem' }}
+            >
+              {scanning ? (
+                <>
+                  <svg className="animate-spin-slow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                  Analyzing…
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  Scan Now
+                </>
               )}
             </button>
           </div>
