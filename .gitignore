@@ -107,3 +107,9 @@ CLEANVISION_BUILD_PROMPT.md
 .ruff_cache/
 coverage/
 *.log
+
+# ─────────────────────────────────────────────
+# Training datasets
+# ─────────────────────────────────────────────
+cleanvision_dataset/
+cleanvision_dataset.zip
