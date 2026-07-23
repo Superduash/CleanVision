@@ -1,0 +1,215 @@
+/* ============================================================================
+   CleanVision Global Styles
+   Imports Tailwind v4, design tokens, and typography. Defines resets,
+   keyframes, skeleton shimmer, and print styles.
+   ============================================================================ */
+
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./typography.css";
+
+/* ---- Tailwind v4 theme mapping ---- */
+@theme {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-hover: var(--brand-teal-hover);
+  --color-brand-teal-tint: var(--brand-teal-tint);
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-violet-tint: var(--accent-violet-tint);
+  --color-status-clean: var(--status-clean);
+  --color-status-clean-tint: var(--status-clean-tint);
+  --color-status-attention: var(--status-attention);
+  --color-status-attention-tint: var(--status-attention-tint);
+  --color-status-dirty: var(--status-dirty);
+  --color-status-dirty-tint: var(--status-dirty-tint);
+  --color-status-info: var(--status-info);
+  --color-status-info-tint: var(--status-info-tint);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-family-body: var(--font-body);
+  --font-family-display: var(--font-display);
+  --font-family-mono: var(--font-mono);
+}
+
+/* ---- Global resets ---- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background-color: var(--canvas);
+  min-height: var(--viewport-height);
+  overflow-x: hidden;
+}
+
+/* Kill 300ms tap delay and prevent double-tap zoom on interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[tabindex] {
+  touch-action: manipulation;
+}
+
+/* Prevent iOS zoom on input focus — font-size must be >= 16px */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Ensure long text doesn't cause horizontal scroll */
+.truncate-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- Skeleton shimmer keyframes ---- */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes pulse-opacity {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ---- Analyzing sweep keyframes ---- */
+@keyframes scan-sweep {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+/* ---- Mock badge pulse ---- */
+@keyframes mock-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* ---- Focus ring utility ---- */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-focus);
+}
+
+/* ---- Scrollbar styling ---- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.1s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.1s !important;
+    scroll-behavior: auto !important;
+  }
+
+  @keyframes shimmer {
+    /* Replace with static pulse for reduced motion */
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
+
+/* ---- Print styles ---- */
+@media print {
+  /* Hide nav, chrome, and interactive elements */
+  nav,
+  .bottom-nav,
+  .sidebar-nav,
+  .fab,
+  .offline-banner,
+  .floating-status,
+  .staff-chip,
+  .toast-container,
+  button:not(.print-visible),
+  [role="navigation"] {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  /* Ensure content fills page */
+  .print-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Show URLs for links */
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.8em;
+    color: #666;
+  }
+}

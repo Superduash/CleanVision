@@ -36,7 +36,7 @@ SCANS_FOLDER = os.path.join(UPLOAD_FOLDER, "scans")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
 FRONTEND_BUILD = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend", "build")
+    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 )
 
 
@@ -213,6 +213,18 @@ def get_history(room_id):
 def health_check():
     """Health check endpoint. Used by frontend and deploy monitors."""
     return jsonify({"status": "ok", "mock_mode": model.MOCK_MODE}), 200
+
+
+@app.route("/api/reports/summary", methods=["GET"])
+def reports_summary():
+    """Aggregate cleanliness stats across all rooms for the Reports screen."""
+    try:
+        days = request.args.get("days", default=7, type=int)
+        days = max(1, min(days, 30))  # clamp 1-30
+        summary = database.get_reports_summary(days=days)
+        return jsonify(summary), 200
+    except Exception:
+        return jsonify({"error": "Failed to generate report summary"}), 500
 
 
 # --------------------------------------------------------------------------- #

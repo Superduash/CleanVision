@@ -1,0 +1,140 @@
+/* ============================================================================
+   CleanVision Design Tokens
+   Verbatim from UIPrompt.md §3 — do not modify these values arbitrarily.
+   ============================================================================ */
+
+:root {
+  /* ---- Light mode (default) ---- */
+  --canvas: #F8F6F2;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --border-subtle: #E8E4DC;
+  --border-strong: #D8D2C6;
+
+  --text-primary: #171A1C;
+  --text-secondary: #5B6167;
+  --text-tertiary: #8A8F94;
+
+  --brand-teal: #0E6E72;
+  --brand-teal-hover: #0A585B;
+  --brand-teal-tint: #E3F1F0;
+
+  --accent-violet: #6D5EF0;
+  --accent-violet-tint: #EEEBFE;
+
+  --status-clean: #157F45;
+  --status-clean-tint: #E3F6EC;
+  --status-attention: #B45309;
+  --status-attention-tint: #FCF0DC;
+  --status-dirty: #C22F2F;
+  --status-dirty-tint: #FBE7E7;
+  --status-info: #2A5DB0;
+  --status-info-tint: #E7EFFB;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 2px rgba(23,26,28,0.04), 0 1px 1px rgba(23,26,28,0.03);
+  --shadow-md: 0 4px 12px rgba(23,26,28,0.06), 0 2px 4px rgba(23,26,28,0.04);
+  --shadow-lg: 0 12px 32px rgba(23,26,28,0.10), 0 4px 8px rgba(23,26,28,0.04);
+  --glow-focus: 0 0 0 3px var(--brand-teal-tint);
+
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --duration-instant: 90ms;
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+  --duration-hero: 600ms;
+
+  /* ---- Safe area tokens ---- */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* ---- Viewport height (100dvh with fallback) ---- */
+  --viewport-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --viewport-height: 100dvh;
+  }
+}
+
+/* ---- Dark mode ---- */
+[data-theme="dark"] {
+  --canvas: #0B0D0F;
+  --surface: #15181B;
+  --surface-raised: #1C2023;
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.14);
+
+  --text-primary: #F3F5F5;
+  --text-secondary: #9CA3A8;
+  --text-tertiary: #6E7378;
+
+  --brand-teal: #2FD1C6;
+  --brand-teal-hover: #57DED4;
+  --brand-teal-tint: rgba(47,209,198,0.12);
+
+  --accent-violet: #9B8CFF;
+  --accent-violet-tint: rgba(155,140,255,0.14);
+
+  --status-clean: #3FCB80;
+  --status-clean-tint: rgba(63,203,128,0.14);
+  --status-attention: #F0A93F;
+  --status-attention-tint: rgba(240,169,63,0.14);
+  --status-dirty: #F1665F;
+  --status-dirty-tint: rgba(241,102,95,0.14);
+  --status-info: #6FA3F5;
+  --status-info-tint: rgba(111,163,245,0.14);
+
+  /* dark mode uses borders + subtle glow instead of shadows */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --border-elevated: 1px solid var(--border-strong);
+}
+
+@theme {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+
+  --color-brand-teal: var(--brand-teal);
+  --color-brand-teal-hover: var(--brand-teal-hover);
+  --color-brand-teal-tint: var(--brand-teal-tint);
+
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-violet-tint: var(--accent-violet-tint);
+
+  --color-status-clean: var(--status-clean);
+  --color-status-clean-tint: var(--status-clean-tint);
+  --color-status-attention: var(--status-attention);
+  --color-status-attention-tint: var(--status-attention-tint);
+  --color-status-dirty: var(--status-dirty);
+  --color-status-dirty-tint: var(--status-dirty-tint);
+  --color-status-info: var(--status-info);
+  --color-status-info-tint: var(--status-info-tint);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-glow-focus: var(--glow-focus);
+}

@@ -93,10 +93,14 @@ Desktop.ini
 # Export script output
 # ─────────────────────────────────────────────
 Complete_Project_Code.txt
+Frontend.txt
+Backend.txt
 export.py
 
 # Internal build/dev prompts
 CLEANVISION_BUILD_PROMPT.md
+UIPrompt.md
+UIplan.md
 
 # ─────────────────────────────────────────────
 # Caches & misc

@@ -147,3 +147,104 @@ def get_scan_history(room_id, limit=10):
         )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+def get_reports_summary(days=7):
+    """
+    Aggregate cleanliness stats for the Reports screen.
+    Returns today_count, avg_score_today, status_counts (most recent scan per room),
+    daily_trend (continuous x-axis), and block_breakdown.
+    """
+    from datetime import datetime, timedelta
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # today_count + avg_score_today
+        cursor.execute("""
+            SELECT COUNT(*) as cnt,
+                   COALESCE(ROUND(AVG(cleanliness_score), 1), 0) as avg
+            FROM scans
+            WHERE date(timestamp) = date('now')
+        """)
+        today = cursor.fetchone()
+        today_count = today["cnt"]
+        avg_score_today = today["avg"]
+
+        # status_counts — most recent scan per room only
+        cursor.execute("""
+            SELECT
+                SUM(CASE WHEN s.status = 'clean' THEN 1 ELSE 0 END) as clean,
+                SUM(CASE WHEN s.status = 'needs_attention' THEN 1 ELSE 0 END) as needs_attention,
+                SUM(CASE WHEN s.status = 'dirty' THEN 1 ELSE 0 END) as dirty
+            FROM scans s
+            INNER JOIN (
+                SELECT room_id, MAX(timestamp) as max_ts
+                FROM scans GROUP BY room_id
+            ) latest ON s.room_id = latest.room_id AND s.timestamp = latest.max_ts
+        """)
+        sc = cursor.fetchone()
+        status_counts = {
+            "clean": sc["clean"] or 0,
+            "needs_attention": sc["needs_attention"] or 0,
+            "dirty": sc["dirty"] or 0,
+        }
+
+        # daily_trend — continuous, fill missing days with 0
+        today_date = datetime.now().date()
+        trend_dates = [
+            (today_date - timedelta(days=i)).isoformat()
+            for i in range(days - 1, -1, -1)
+        ]
+
+        cursor.execute("""
+            SELECT date(timestamp) as d,
+                   ROUND(AVG(cleanliness_score), 1) as avg_score,
+                   COUNT(*) as scan_count
+            FROM scans
+            WHERE date(timestamp) >= date('now', ?)
+            GROUP BY date(timestamp)
+            ORDER BY date(timestamp) ASC
+        """, (f"-{days} days",))
+        trend_rows = {
+            row["d"]: {"avg_score": row["avg_score"], "scan_count": row["scan_count"]}
+            for row in cursor.fetchall()
+        }
+        daily_trend = [
+            {
+                "date": d,
+                "avg_score": trend_rows.get(d, {}).get("avg_score", 0),
+                "scan_count": trend_rows.get(d, {}).get("scan_count", 0),
+            }
+            for d in trend_dates
+        ]
+
+        # block_breakdown — each room's latest scan, grouped by block
+        cursor.execute("""
+            SELECT
+                r.block,
+                COUNT(DISTINCT r.id) as room_count,
+                ROUND(AVG(s.cleanliness_score), 1) as avg_score,
+                SUM(CASE WHEN s.status IN ('needs_attention', 'dirty')
+                    THEN 1 ELSE 0 END) as attention_count
+            FROM rooms r
+            LEFT JOIN (
+                SELECT s1.room_id, s1.cleanliness_score, s1.status
+                FROM scans s1
+                INNER JOIN (
+                    SELECT room_id, MAX(timestamp) as max_ts
+                    FROM scans GROUP BY room_id
+                ) s2 ON s1.room_id = s2.room_id AND s1.timestamp = s2.max_ts
+            ) s ON r.id = s.room_id
+            GROUP BY r.block
+            ORDER BY r.block ASC
+        """)
+        block_breakdown = [dict(row) for row in cursor.fetchall()]
+
+    return {
+        "today_count": today_count,
+        "avg_score_today": avg_score_today,
+        "status_counts": status_counts,
+        "daily_trend": daily_trend,
+        "block_breakdown": block_breakdown,
+    }
