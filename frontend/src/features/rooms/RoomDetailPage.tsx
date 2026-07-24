@@ -22,7 +22,7 @@ export default function RoomDetailPage() {
     return (
       <div className="p-4 md:p-8 max-w-5xl mx-auto w-full flex flex-col gap-6">
         <RoomCardSkeleton />
-        <div className="h-64 bg-[var(--surface)] rounded-[var(--radius-lg)] animate-pulse" />
+        <div className="h-64 bg-surface rounded-lg animate-pulse" />
       </div>
     );
   }
@@ -36,23 +36,23 @@ export default function RoomDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 max-w-5xl mx-auto w-full pb-32">
+    <div className="flex flex-col gap-6 w-full pb-32">
       {/* Header with back button */}
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <button 
             onClick={() => navigate(-1)}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--surface)] border border-[var(--border-subtle)] hover:bg-[var(--surface-raised)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-teal-tint)]"
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-surface border border-border-subtle hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-tint"
             aria-label="Go back"
           >
             <ChevronLeft size={20} />
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-h2 font-bold text-[var(--text-primary)]">{room.name}</h1>
+              <h1 className="text-h2 font-bold text-text-primary">{room.name}</h1>
               {room.latest_status && <Badge variant={room.latest_status} />}
             </div>
-            <p className="text-sm text-[var(--text-tertiary)]">Block {room.block}</p>
+            <p className="text-sm text-text-tertiary">Block {room.block}</p>
           </div>
         </div>
 
@@ -64,39 +64,41 @@ export default function RoomDetailPage() {
       </header>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-4">
         
         {/* Left Column - Details & QR */}
         <div className="lg:col-span-1 flex flex-col gap-6">
-          <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] p-5 flex flex-col gap-4">
+          <div className="bg-surface-raised border border-border-elevated rounded-xl shadow-sm p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium text-[var(--text-secondary)]">Current Status</h3>
+              <h3 className="text-body font-medium text-text-secondary">Current Status</h3>
             </div>
             
             <div className="flex items-baseline gap-2">
               {room.latest_score != null ? (
                 <>
-                  <span className="text-display-lg font-bold text-mono text-[var(--text-primary)] leading-none">
+                  <span className="text-display-lg font-bold text-mono text-text-primary leading-none">
                     {formatScore(room.latest_score)}
                   </span>
-                  <span className="text-[var(--text-tertiary)]">/10</span>
+                  <span className="text-body text-text-tertiary">/10</span>
                 </>
               ) : (
-                <span className="text-body text-[var(--text-tertiary)] italic">Unscanned</span>
+                <span className="text-body text-text-tertiary italic">Unscanned</span>
               )}
             </div>
 
-            <p className="text-xs text-[var(--text-tertiary)]">
+            <p className="text-sm text-text-tertiary">
               Last scanned: {room.last_scanned ? relativeTime(room.last_scanned) : 'Never'}
             </p>
           </div>
 
-          <RoomQRCode room={room} />
+          <div className="bg-surface-raised border border-border-elevated rounded-xl shadow-sm p-6 flex flex-col gap-4">
+            <RoomQRCode room={room} />
+          </div>
         </div>
 
         {/* Right Column - Baseline & History */}
         <div className="lg:col-span-2 flex flex-col gap-8">
-          <section className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] shadow-[var(--shadow-sm)] p-5 sm:p-6">
+          <section className="bg-surface-raised border border-border-elevated rounded-xl shadow-sm p-6 sm:p-8">
             <BaselineUpload roomId={room.id} currentBaselinePath={room.baseline_image_path} />
           </section>
 

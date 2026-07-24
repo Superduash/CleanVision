@@ -23,7 +23,7 @@ export function StaffChip() {
           setTempName(staffName);
           setIsOpen(true);
         }}
-        className="staff-chip flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--surface-raised)] border border-[var(--border-subtle)] text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]"
+        className="staff-chip flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-raised border border-border-subtle text-sm font-medium text-text-secondary hover:text-text-primary hover:border-border-strong transition-colors focus-visible:outline-none focus-visible:shadow-glow-focus"
         aria-label="Set staff name"
       >
         <User size={14} />
@@ -46,7 +46,7 @@ export function StaffChip() {
             maxLength={20}
             autoFocus
           />
-          <p className="text-xs text-[var(--text-tertiary)] -mt-2">
+          <p className="text-xs text-text-tertiary -mt-2">
             Stored locally on your device only.
           </p>
           <div className="flex gap-3 justify-end mt-2">

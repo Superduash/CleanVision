@@ -62,18 +62,18 @@ export function getStatusColors(status: Status): {
 /** Get the Tailwind color class string for a status */
 export function getStatusColorClass(status: Status): string {
   switch (status) {
-    case 'clean': return 'text-[var(--status-clean)]';
-    case 'needs_attention': return 'text-[var(--status-attention)]';
-    case 'dirty': return 'text-[var(--status-dirty)]';
+    case 'clean': return 'text-status-clean';
+    case 'needs_attention': return 'text-status-attention';
+    case 'dirty': return 'text-status-dirty';
   }
 }
 
 /** Get the tint background class for a status */
 export function getStatusTintClass(status: Status): string {
   switch (status) {
-    case 'clean': return 'bg-[var(--status-clean-tint)]';
-    case 'needs_attention': return 'bg-[var(--status-attention-tint)]';
-    case 'dirty': return 'bg-[var(--status-dirty-tint)]';
+    case 'clean': return 'bg-status-clean-tint';
+    case 'needs_attention': return 'bg-status-attention-tint';
+    case 'dirty': return 'bg-status-dirty-tint';
   }
 }
 

@@ -16,7 +16,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {label ? (
           <label
             htmlFor={selectId}
-            className="text-sm font-medium text-[var(--text-primary)]"
+            className="text-sm font-medium text-text-primary"
           >
             {label}
           </label>
@@ -25,12 +25,12 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           ref={ref}
           id={selectId}
           className={cn(
-            'w-full px-3 py-2.5 rounded-[var(--radius-md)]',
-            'bg-[var(--surface)] border border-[var(--border-strong)]',
-            'text-[var(--text-primary)] text-[16px] leading-normal',
-            'font-[var(--font-body)] cursor-pointer',
-            'transition-all duration-[var(--duration-fast)]',
-            'focus:outline-none focus:border-[var(--brand-teal)] focus:shadow-[var(--glow-focus)]',
+            'w-full px-3 py-2.5 rounded-md',
+            'bg-surface border border-border-strong',
+            'text-text-primary text-[16px] leading-normal',
+            'font-sans cursor-pointer',
+            'transition-all duration-fast',
+            'focus:outline-none focus:border-brand-teal focus:shadow-glow-focus',
             'disabled:opacity-40 disabled:cursor-not-allowed',
             'min-h-[44px]',
             error ? 'border-[var(--status-dirty)]' : '',
@@ -50,7 +50,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           ))}
         </select>
         {error ? (
-          <p className="text-xs text-[var(--status-dirty)]" role="alert">
+          <p className="text-xs text-status-dirty" role="alert">
             {error}
           </p>
         ) : null}

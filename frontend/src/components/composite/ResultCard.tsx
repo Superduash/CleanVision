@@ -19,9 +19,9 @@ export function ResultCard({ scan }: ResultCardProps) {
   };
 
   return (
-    <div className="bg-[var(--surface)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] border border-[var(--border-subtle)] overflow-hidden flex flex-col">
+    <div className="bg-surface rounded-xl shadow-lg border border-border-subtle overflow-hidden flex flex-col">
       {/* Image half */}
-      <div className="relative h-48 sm:h-64 bg-[var(--canvas)]">
+      <div className="relative h-48 sm:h-64 bg-canvas">
         {scan.image_path ? (
           <img
             src={getImageUrl(scan.image_path)}
@@ -37,22 +37,22 @@ export function ResultCard({ scan }: ResultCardProps) {
       {/* Details half */}
       <div className="p-6 flex flex-col items-center text-center gap-4 relative">
         {/* Score Ring pulled up slightly over the image */}
-        <div className="absolute -top-16 bg-[var(--surface)] rounded-full p-1 shadow-sm">
+        <div className="absolute -top-16 bg-surface rounded-full p-1 shadow-sm">
           <ScoreRing score={scan.score} status={scan.status} size={100} strokeWidth={8} />
         </div>
 
         <div className="mt-12 w-full">
-          <h2 className="text-h2 font-bold text-[var(--text-primary)] mb-2">
+          <h2 className="text-h2 font-bold text-text-primary mb-2">
             {getStatusLabel(scan.status)}
           </h2>
-          <p className="text-[var(--text-secondary)] text-body">
+          <p className="text-text-secondary text-body">
             {getMessage(scan.status)}
           </p>
         </div>
 
         {scan.mock && (
-          <div className="w-full p-3 bg-[var(--border-subtle)] rounded-[var(--radius-md)] mt-2">
-            <p className="text-xs text-[var(--text-secondary)]">
+          <div className="w-full p-3 bg-[var(--border-subtle)] rounded-md mt-2">
+            <p className="text-xs text-text-secondary">
               This is a mock result (AI engine offline).
             </p>
           </div>

@@ -2,6 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Prevent flash-of-wrong-theme: reads localStorage synchronously before first paint -->
+    <script>
+      (function () {
+        try {
+          var stored = JSON.parse(localStorage.getItem('cv-theme') || 'null');
+          var theme = stored && stored.state && stored.state.theme ? stored.state.theme : 'system';
+          var resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme;
+          document.documentElement.setAttribute('data-theme', resolved);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#F8F6F2" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0B0D0F" media="(prefers-color-scheme: dark)" />

@@ -19,18 +19,18 @@ export function ImagePreviewCard({ file, onRetake, onSubmit, loading }: ImagePre
   }, [file]);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--canvas)]">
+    <div className="flex flex-col h-full bg-canvas">
       <div className="flex-1 relative p-4 overflow-hidden flex flex-col items-center justify-center">
         {previewUrl ? (
           <img
             src={previewUrl}
             alt="Preview"
-            className="max-h-full max-w-full object-contain rounded-[var(--radius-lg)] shadow-[var(--shadow-md)]"
+            className="max-h-full max-w-full object-contain rounded-lg shadow-md"
           />
         ) : null}
       </div>
       
-      <div className="p-4 bg-[var(--surface)] border-t border-[var(--border-subtle)] flex gap-3 p-safe-bottom">
+      <div className="p-4 bg-surface border-t border-border-subtle flex gap-3 p-safe-bottom">
         <Button
           variant="secondary"
           onClick={onRetake}

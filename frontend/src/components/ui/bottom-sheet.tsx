@@ -73,8 +73,8 @@ export function BottomSheet({
             style={{ paddingBottom: 'max(var(--safe-bottom), 16px)' }}
             className={cn(
               'fixed bottom-0 left-0 right-0 z-50',
-              'bg-[var(--surface)] rounded-t-[var(--radius-xl)]',
-              'border-t border-[var(--border-subtle)] shadow-[var(--shadow-lg)]',
+              'bg-surface rounded-t-[var(--radius-xl)]',
+              'border-t border-border-subtle shadow-lg',
               'max-h-[90dvh] flex flex-col',
               className,
             )}
@@ -90,7 +90,7 @@ export function BottomSheet({
             <div className="flex items-center justify-between px-6 py-4">
               <h2
                 id="sheet-title"
-                className="text-h3 text-[var(--text-primary)]"
+                className="text-h3 text-text-primary"
               >
                 {title}
               </h2>
@@ -99,9 +99,9 @@ export function BottomSheet({
                 aria-label="Close"
                 className={cn(
                   'w-8 h-8 flex items-center justify-center',
-                  'rounded-[var(--radius-md)] text-[var(--text-secondary)]',
+                  'rounded-md text-text-secondary',
                   'hover:bg-[var(--border-subtle)] transition-colors',
-                  'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]',
+                  'focus-visible:outline-none focus-visible:shadow-glow-focus',
                 )}
               >
                 <X size={18} aria-hidden="true" />

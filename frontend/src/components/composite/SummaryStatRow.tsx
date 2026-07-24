@@ -14,7 +14,7 @@ export function SummaryStatRow({ summary, isLoading }: SummaryStatRowProps) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-28 rounded-[var(--radius-lg)]" />
+          <Skeleton key={i} className="h-28 rounded-lg" />
         ))}
       </div>
     );
@@ -32,12 +32,12 @@ export function SummaryStatRow({ summary, isLoading }: SummaryStatRowProps) {
       <StatCard
         label="Clean Rooms"
         value={status_counts.clean}
-        icon={<CheckCircle2 size={18} className="text-[var(--status-clean)]" />}
+        icon={<CheckCircle2 size={18} className="text-status-clean" />}
       />
       <StatCard
         label="Needs Attention"
         value={status_counts.needs_attention}
-        icon={<AlertTriangle size={18} className="text-[var(--status-attention)]" />}
+        icon={<AlertTriangle size={18} className="text-status-attention" />}
       />
       <StatCard
         label="Avg Score"

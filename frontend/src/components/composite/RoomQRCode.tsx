@@ -17,8 +17,8 @@ export function RoomQRCode({ room }: RoomQRCodeProps) {
   };
 
   return (
-    <div className="flex flex-col items-center gap-4 bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)]">
-      <div className="bg-white p-4 rounded-[var(--radius-md)] border border-gray-200">
+    <div className="flex flex-col items-center gap-4 bg-surface p-6 rounded-lg border border-border-subtle shadow-sm">
+      <div className="bg-white p-4 rounded-md border border-gray-200">
         <QRCodeSVG 
           value={scanUrl} 
           size={200}
@@ -28,11 +28,11 @@ export function RoomQRCode({ room }: RoomQRCodeProps) {
       </div>
       
       <div className="text-center">
-        <h3 className="text-h3 font-semibold text-[var(--text-primary)]">{room.name}</h3>
-        <p className="text-sm text-[var(--text-secondary)]">{room.block}</p>
+        <h3 className="text-h3 font-semibold text-text-primary">{room.name}</h3>
+        <p className="text-sm text-text-secondary">{room.block}</p>
       </div>
       
-      <p className="text-xs text-[var(--text-tertiary)] max-w-xs text-center">
+      <p className="text-xs text-text-tertiary max-w-xs text-center">
         Print and place this QR code in the room. Cleaners can scan it to quickly log a new cleanliness report.
       </p>
 

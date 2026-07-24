@@ -13,7 +13,7 @@ export function ErrorBoundary() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--canvas)] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-canvas flex items-center justify-center p-6">
       <ErrorState 
         title="App Error"
         message={errorMessage} 

@@ -63,12 +63,12 @@ export function ScoreRing({
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
         <span
-          className="text-display-lg font-bold text-mono text-[var(--text-primary)]"
+          className="text-display-lg font-bold text-mono text-text-primary"
           style={{ lineHeight: 1 }}
         >
           {formatScore(score)}
         </span>
-        <span className="text-caption text-[var(--text-tertiary)] mt-1">/10</span>
+        <span className="text-caption text-text-tertiary mt-1">/10</span>
       </div>
     </div>
   );

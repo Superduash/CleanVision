@@ -106,10 +106,10 @@ export default function ScanFlowPage() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[var(--canvas)] flex flex-col sm:pb-0 h-[100dvh] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-canvas flex flex-col sm:pb-0 h-[100dvh] overflow-hidden">
       {/* Header overlay for camera/preview, solid for others */}
       <header className={`flex items-center justify-between p-4 p-safe-top z-10 ${
-        (step === 'camera' || step === 'preview') ? 'absolute top-0 left-0 right-0 bg-gradient-to-b from-black/50 to-transparent text-white' : 'bg-[var(--surface)] border-b border-[var(--border-subtle)]'
+        (step === 'camera' || step === 'preview') ? 'absolute top-0 left-0 right-0 bg-gradient-to-b from-black/50 to-transparent text-white' : 'bg-surface border-b border-border-subtle'
       }`}>
         {step === 'result' ? (
           <Button variant="ghost" onClick={handleClose} className={step === 'result' ? '' : 'text-white hover:text-white/80 hover:bg-white/20'}>
@@ -119,7 +119,7 @@ export default function ScanFlowPage() {
           <button 
             onClick={handleClose}
             className={`w-10 h-10 flex items-center justify-center rounded-full ${
-              (step === 'camera' || step === 'preview') ? 'bg-black/40 hover:bg-black/60 backdrop-blur-md text-white' : 'bg-[var(--surface-raised)] text-[var(--text-primary)]'
+              (step === 'camera' || step === 'preview') ? 'bg-black/40 hover:bg-black/60 backdrop-blur-md text-white' : 'bg-surface-raised text-text-primary'
             }`}
             aria-label="Close scan"
           >

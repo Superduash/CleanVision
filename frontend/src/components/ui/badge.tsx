@@ -12,26 +12,26 @@ const config: Record<
   clean: {
     icon: <CheckCircle2 size={12} aria-hidden="true" />,
     label: 'Clean',
-    color: 'text-[var(--status-clean)]',
-    bg: 'bg-[var(--status-clean-tint)]',
+    color: 'text-status-clean',
+    bg: 'bg-status-clean-tint',
   },
   needs_attention: {
     icon: <AlertTriangle size={12} aria-hidden="true" />,
     label: 'Needs Attention',
-    color: 'text-[var(--status-attention)]',
-    bg: 'bg-[var(--status-attention-tint)]',
+    color: 'text-status-attention',
+    bg: 'bg-status-attention-tint',
   },
   dirty: {
     icon: <XCircle size={12} aria-hidden="true" />,
     label: 'Dirty',
-    color: 'text-[var(--status-dirty)]',
-    bg: 'bg-[var(--status-dirty-tint)]',
+    color: 'text-status-dirty',
+    bg: 'bg-status-dirty-tint',
   },
   info: {
     icon: <Info size={12} aria-hidden="true" />,
     label: 'Info',
-    color: 'text-[var(--status-info)]',
-    bg: 'bg-[var(--status-info-tint)]',
+    color: 'text-status-info',
+    bg: 'bg-status-info-tint',
   },
 };
 
@@ -48,7 +48,7 @@ export function Badge({ variant, label, className }: BadgeProps) {
     <span
       className={cn(
         'inline-flex items-center gap-1 px-2 py-0.5',
-        'rounded-[var(--radius-sm)]',
+        'rounded-sm',
         'text-caption font-medium',
         c.color,
         c.bg,
@@ -78,13 +78,13 @@ export function Chip({ label, onDismiss, active, onClick, className }: ChipProps
       onClick={onClick}
       className={cn(
         'inline-flex items-center gap-1.5 px-3 py-1.5',
-        'rounded-[var(--radius-sm)] text-sm font-medium border',
-        'transition-all duration-[var(--duration-fast)]',
-        'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]',
-        'touch-manipulation min-h-[36px]',
+        'rounded-md text-sm font-medium border',
+        'transition-all duration-fast',
+        'focus-visible:outline-none focus-visible:shadow-glow-focus',
+        'touch-manipulation min-h-[44px]',
         active
-          ? 'bg-[var(--brand-teal-tint)] text-[var(--brand-teal)] border-[var(--brand-teal)]'
-          : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border-strong)] hover:border-[var(--brand-teal)] hover:text-[var(--brand-teal)]',
+          ? 'bg-brand-teal-tint text-brand-teal border-[var(--brand-teal)]'
+          : 'bg-surface text-text-secondary border-border-strong hover:border-[var(--brand-teal)] hover:text-brand-teal hover:bg-brand-teal-tint/30',
         className,
       )}
     >
@@ -97,7 +97,7 @@ export function Chip({ label, onDismiss, active, onClick, className }: ChipProps
             e.stopPropagation();
             onDismiss();
           }}
-          className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] leading-none"
+          className="text-text-tertiary hover:text-text-primary leading-none"
         >
           ×
         </span>

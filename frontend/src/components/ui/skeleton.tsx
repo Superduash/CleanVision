@@ -11,8 +11,8 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-[var(--radius-md)]',
-        'bg-[var(--surface-raised)]',
+        'relative overflow-hidden rounded-md',
+        'bg-surface-raised',
         className,
       )}
       aria-hidden="true"
@@ -46,10 +46,10 @@ export function SkeletonText({ lines = 3, className }: SkeletonProps) {
 /** Room card shaped skeleton */
 export function RoomCardSkeleton() {
   return (
-    <div className="p-4 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface)] flex flex-col gap-3">
+    <div className="p-4 rounded-lg border border-border-subtle bg-surface flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Skeleton className="h-4 w-16" />
-        <Skeleton className="h-5 w-20 rounded-[var(--radius-sm)]" />
+        <Skeleton className="h-5 w-20 rounded-sm" />
       </div>
       <Skeleton className="h-6 w-3/4" />
       <div className="flex items-center justify-between">
@@ -78,12 +78,12 @@ export function BlockSectionSkeleton() {
 export function TimelineRowSkeleton() {
   return (
     <div className="flex items-center gap-4 py-3">
-      <Skeleton className="w-12 h-12 rounded-[var(--radius-md)] shrink-0" />
+      <Skeleton className="w-12 h-12 rounded-md shrink-0" />
       <div className="flex-1 flex flex-col gap-2">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-3 w-24" />
       </div>
-      <Skeleton className="h-6 w-16 rounded-[var(--radius-sm)]" />
+      <Skeleton className="h-6 w-16 rounded-sm" />
     </div>
   );
 }

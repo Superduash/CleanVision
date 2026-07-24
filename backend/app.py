@@ -242,7 +242,7 @@ def serve_upload(filename):
     requested = os.path.realpath(os.path.join(UPLOAD_FOLDER, filename))
     if not requested.startswith(safe_uploads + os.sep):
         return jsonify({"error": "Forbidden"}), 403
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    return send_from_directory(UPLOAD_FOLDER, filename, max_age=31536000)
 
 
 # --------------------------------------------------------------------------- #

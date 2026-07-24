@@ -37,7 +37,7 @@ export function AnalyzingState({ imageFile, status }: AnalyzingStateProps) {
 
   return (
     <div className="flex flex-col items-center justify-center p-6 h-full text-center">
-      <div className="relative w-64 h-64 rounded-[var(--radius-xl)] overflow-hidden shadow-[var(--shadow-lg)] bg-[var(--surface-raised)] border border-[var(--border-subtle)] mb-8">
+      <div className="relative w-64 h-64 rounded-xl overflow-hidden shadow-lg bg-surface-raised border border-border-subtle mb-8">
         {previewUrl ? (
           <img src={previewUrl} alt="Analyzing" className="w-full h-full object-cover opacity-60" />
         ) : (
@@ -63,7 +63,7 @@ export function AnalyzingState({ imageFile, status }: AnalyzingStateProps) {
                 exit={{ scale: 0.8, opacity: 0 }}
                 transition={{ repeat: Infinity, duration: 1.5, repeatType: 'reverse' }}
               >
-                <Sparkles size={48} className="text-[var(--brand-teal)] drop-shadow-md" />
+                <Sparkles size={48} className="text-brand-teal drop-shadow-md" />
               </motion.div>
             ) : (
               <motion.div
@@ -72,7 +72,7 @@ export function AnalyzingState({ imageFile, status }: AnalyzingStateProps) {
                 animate={{ scale: 1, opacity: 1 }}
                 className="bg-white rounded-full p-2"
               >
-                <CheckCircle size={48} className="text-[var(--status-clean)]" />
+                <CheckCircle size={48} className="text-status-clean" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -87,10 +87,10 @@ export function AnalyzingState({ imageFile, status }: AnalyzingStateProps) {
           exit={{ opacity: 0, y: -10 }}
           className="h-16"
         >
-          <h2 className="text-h2 text-[var(--text-primary)] mb-2">
+          <h2 className="text-h2 text-text-primary mb-2">
             {status === 'analyzing' ? 'Analyzing Image' : 'Analysis Complete'}
           </h2>
-          <p className="text-[var(--text-secondary)] text-sm">
+          <p className="text-text-secondary text-sm">
             {status === 'analyzing' ? tips[tipIndex] : 'Generating report...'}
           </p>
         </motion.div>

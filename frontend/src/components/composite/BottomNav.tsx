@@ -12,7 +12,7 @@ const NAV_ITEMS = [
 
 export function BottomNav() {
   return (
-    <nav className="bottom-nav fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border-subtle)] pb-safe md:hidden z-40">
+    <nav className="bottom-nav fixed bottom-0 left-0 right-0 bg-surface border-t border-border-subtle pb-safe md:hidden z-40">
       <div className="flex items-center justify-around h-16">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -25,8 +25,8 @@ export function BottomNav() {
                   'flex flex-col items-center justify-center w-full h-full gap-1',
                   'transition-colors duration-200 touch-manipulation',
                   isActive
-                    ? 'text-[var(--brand-teal)]'
-                    : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                    ? 'text-brand-teal'
+                    : 'text-text-tertiary hover:text-text-primary'
                 )
               }
             >

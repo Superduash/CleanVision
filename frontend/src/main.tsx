@@ -4,7 +4,7 @@ import { Providers } from './app/providers';
 import { AppRouter } from './app/router';
 
 // Global styles
-import './index.css';
+import './styles/globals.css';
 
 // Pre-initialize stores if needed
 import '@/lib/stores/themeStore';

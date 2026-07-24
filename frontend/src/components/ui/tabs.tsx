@@ -13,7 +13,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
     <div
       role="tablist"
       className={cn(
-        'inline-flex bg-[var(--border-subtle)] rounded-[var(--radius-md)] p-0.5 gap-0.5',
+        'inline-flex bg-[var(--border-subtle)] rounded-md p-0.5 gap-0.5',
         className,
       )}
     >
@@ -26,13 +26,13 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
             aria-selected={isActive}
             onClick={() => onChange(tab.value)}
             className={cn(
-              'px-3 py-1.5 rounded-[var(--radius-sm)] text-sm font-medium',
-              'transition-all duration-[var(--duration-fast)]',
-              'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]',
+              'px-3 py-1.5 rounded-sm text-sm font-medium',
+              'transition-all duration-fast',
+              'focus-visible:outline-none focus-visible:shadow-glow-focus',
               'min-h-[36px] touch-manipulation',
               isActive
-                ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-[var(--shadow-sm)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+                ? 'bg-surface text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary',
             )}
           >
             {tab.label}
@@ -56,7 +56,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label ? (
           <label
             htmlFor={textareaId}
-            className="text-sm font-medium text-[var(--text-primary)]"
+            className="text-sm font-medium text-text-primary"
           >
             {label}
           </label>
@@ -65,12 +65,12 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={cn(
-            'w-full px-3 py-2.5 rounded-[var(--radius-md)] resize-y min-h-[100px]',
-            'bg-[var(--surface)] border border-[var(--border-strong)]',
-            'text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]',
-            'text-[16px] leading-normal font-[var(--font-body)]',
-            'transition-all duration-[var(--duration-fast)]',
-            'focus:outline-none focus:border-[var(--brand-teal)] focus:shadow-[var(--glow-focus)]',
+            'w-full px-3 py-2.5 rounded-md resize-y min-h-[100px]',
+            'bg-surface border border-border-strong',
+            'text-text-primary placeholder:text-text-tertiary',
+            'text-[16px] leading-normal font-sans',
+            'transition-all duration-fast',
+            'focus:outline-none focus:border-brand-teal focus:shadow-glow-focus',
             'disabled:opacity-40 disabled:cursor-not-allowed',
             error ? 'border-[var(--status-dirty)]' : '',
             className,
@@ -78,7 +78,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {error ? (
-          <p className="text-xs text-[var(--status-dirty)]" role="alert">
+          <p className="text-xs text-status-dirty" role="alert">
             {error}
           </p>
         ) : null}
@@ -110,8 +110,8 @@ export function Popover({ trigger, children, align = 'right' }: PopoverProps) {
           <div
             className={cn(
               'absolute z-40 mt-2 w-max min-w-[200px]',
-              'bg-[var(--surface-raised)] rounded-[var(--radius-lg)]',
-              'border border-[var(--border-subtle)] shadow-[var(--shadow-lg)]',
+              'bg-surface-raised rounded-lg',
+              'border border-border-subtle shadow-lg',
               'p-2',
               align === 'right' ? 'right-0' : 'left-0',
             )}
@@ -145,7 +145,7 @@ export function Tooltip({ content, children }: TooltipProps) {
           role="tooltip"
           className={cn(
             'absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50',
-            'px-2 py-1 rounded-[var(--radius-sm)]',
+            'px-2 py-1 rounded-sm',
             'bg-[var(--text-primary)] text-[var(--canvas)] text-xs',
             'whitespace-nowrap pointer-events-none',
           )}

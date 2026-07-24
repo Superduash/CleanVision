@@ -143,6 +143,41 @@ CleanVision/
 └── runtime.txt             # Python version for hosting
 ```
 
+## Deployment
+
+### Production Topology (Recommended)
+
+- **Frontend → Vercel** (instant CDN, free tier, automatic preview deploys on every push)
+- **Backend API → Render** (free tier, auto-deploys from `backend/` directory)
+
+This is the canonical deploy path. The Flask backend can *also* serve the built React app via its catch-all route, but that's an alternative development convenience — do not use it as the primary production setup.
+
+### Step-by-step
+
+**1. Deploy backend on Render**
+
+1. Create a new **Web Service** on Render pointing at this repo, root directory `backend/`.
+2. Set **Build Command**: `pip install -r requirements.txt`
+3. Set **Start Command**: `gunicorn app:app --timeout 90 --workers 2` (the `Procfile` sets this automatically)
+4. **⚠️ Add a Persistent Disk**: Mount a disk at `/opt/render/project/src/uploads` (or wherever `UPLOAD_FOLDER` resolves). Without this, every redeploy wipes all uploaded room baseline images and scan history — rooms will still exist in the database but their images will 404. The database file should also live on the persistent disk; set `DATABASE_PATH` env var to a path on the disk.
+5. Set environment variables:
+   - `ALLOWED_ORIGINS` → your Vercel frontend URL (e.g. `https://cleanvision.vercel.app`) — **never leave this as `*` in production**
+   - `FLASK_DEBUG` → `false`
+
+**2. Deploy frontend on Vercel**
+
+1. Import the repo on Vercel, set root directory to `frontend/`.
+2. Set environment variable: `VITE_API_BASE_URL` → your Render backend URL (e.g. `https://cleanvision-api.onrender.com`)
+3. Vercel will auto-build with `npm run build` and deploy.
+
+### Cold-start note
+
+Render free instances spin down after 15 minutes of inactivity. The first request after idle can take **30–60 seconds** while the container boots and TensorFlow loads the model. The UI shows a "Waking up the server…" notice after 5 seconds of a pending request so this doesn't look like a crash.
+
+### Data persistence
+
+SQLite + local `uploads/` are both ephemeral on Render without a persistent disk. **If you skip the disk setup, a redeploy = all rooms and scans disappear.** This will look exactly like the app is broken during a demo. Set up the persistent disk before the first demo.
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -153,15 +188,17 @@ CleanVision/
 | `POST` | `/api/rooms/:id/baseline` | Upload baseline image |
 | `POST` | `/api/scan` | Scan a room (predict cleanliness) |
 | `GET` | `/api/rooms/:id/history` | Get scan history |
+| `GET` | `/api/reports/summary` | Aggregate cleanliness stats |
 | `GET` | `/api/health` | Health check |
 
 ## Tech Stack
 
-- **AI Model**: MobileNetV2 (TensorFlow/Keras .h5)
-- **Backend**: Python + Flask + flask-cors
-- **Database**: SQLite (zero setup)
-- **Frontend**: React + Tailwind CSS
-- **Deployment**: Single service (Flask serves API + React build)
+- **AI Model**: ResNet-18 / MobileNetV2 (TensorFlow/Keras .h5)
+- **Backend**: Python + Flask + flask-cors + Gunicorn
+- **Database**: SQLite (zero setup for dev; add Render Persistent Disk for prod)
+- **Frontend**: React 19 + TypeScript + Tailwind v4 + TanStack Query + motion.dev
+- **PWA**: Workbox service worker via vite-plugin-pwa
+- **Deployment**: Vercel (frontend) + Render (backend API)
 
 ## License
 

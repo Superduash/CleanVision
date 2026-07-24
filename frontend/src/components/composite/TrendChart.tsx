@@ -22,8 +22,8 @@ export function TrendChart({ data }: TrendChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div className="h-64 w-full flex items-center justify-center bg-[var(--surface-raised)] rounded-[var(--radius-lg)]">
-        <span className="text-[var(--text-tertiary)]">No trend data available</span>
+      <div className="h-64 w-full flex items-center justify-center bg-surface-raised rounded-lg">
+        <span className="text-text-tertiary">No trend data available</span>
       </div>
     );
   }
@@ -32,8 +32,8 @@ export function TrendChart({ data }: TrendChartProps) {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-3 rounded-[var(--radius-md)] shadow-[var(--shadow-md)]">
-          <p className="text-xs text-[var(--text-secondary)] mb-2 font-medium">{data.displayDate}</p>
+        <div className="bg-surface border border-border-subtle p-3 rounded-md shadow-md">
+          <p className="text-xs text-text-secondary mb-2 font-medium">{data.displayDate}</p>
           <div className="flex flex-col gap-1">
             <p className="text-sm">
               Avg Score: <span className="font-bold text-mono">{data.avg_score.toFixed(1)}</span>
@@ -49,8 +49,8 @@ export function TrendChart({ data }: TrendChartProps) {
   };
 
   return (
-    <div className="h-64 w-full bg-[var(--surface)] p-4 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] shadow-[var(--shadow-sm)]">
-      <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-4">7-Day Score Trend</h3>
+    <div className="h-64 w-full bg-surface p-4 rounded-lg border border-border-subtle shadow-sm">
+      <h3 className="text-sm font-medium text-text-secondary mb-4">7-Day Score Trend</h3>
       <div className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>

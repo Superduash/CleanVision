@@ -39,14 +39,14 @@ export function BaselineUpload({ roomId, currentBaselinePath }: BaselineUploadPr
 
   return (
     <div className="flex flex-col gap-3">
-      <h3 className="text-h3 font-semibold text-[var(--text-primary)]">Baseline Image</h3>
-      <p className="text-sm text-[var(--text-secondary)]">
+      <h3 className="text-h3 font-semibold text-text-primary">Baseline Image</h3>
+      <p className="text-sm text-text-secondary">
         Upload a picture of the room when it's perfectly clean. 
         The AI uses this as a reference point for future scans.
       </p>
 
       {currentBaselinePath ? (
-        <div className="relative group rounded-[var(--radius-lg)] overflow-hidden border border-[var(--border-subtle)] aspect-video bg-[var(--canvas)]">
+        <div className="relative group rounded-lg overflow-hidden border border-border-subtle aspect-video bg-canvas">
           <img 
             src={getImageUrl(currentBaselinePath)} 
             alt="Current baseline" 
@@ -60,20 +60,20 @@ export function BaselineUpload({ roomId, currentBaselinePath }: BaselineUploadPr
         </div>
       ) : (
         <div 
-          className={`border-2 border-dashed rounded-[var(--radius-lg)] p-8 text-center transition-colors ${
-            isDragging ? 'border-[var(--brand-teal)] bg-[var(--brand-teal-tint)]' : 'border-[var(--border-strong)] hover:border-[var(--text-tertiary)] bg-[var(--surface)]'
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+            isDragging ? 'border-[var(--brand-teal)] bg-brand-teal-tint' : 'border-border-strong hover:border-[var(--text-tertiary)] bg-surface'
           }`}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={onDrop}
         >
-          <div className="w-12 h-12 rounded-full bg-[var(--surface-raised)] flex items-center justify-center mx-auto mb-3 text-[var(--text-tertiary)]">
+          <div className="w-12 h-12 rounded-full bg-surface-raised flex items-center justify-center mx-auto mb-3 text-text-tertiary">
             <ImageIcon size={24} />
           </div>
-          <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+          <p className="text-sm font-medium text-text-primary mb-1">
             Drag & drop an image here
           </p>
-          <p className="text-xs text-[var(--text-secondary)] mb-4">
+          <p className="text-xs text-text-secondary mb-4">
             JPG, PNG or WEBP up to 5MB
           </p>
           <Button onClick={() => fileInputRef.current?.click()} loading={upload.isPending}>

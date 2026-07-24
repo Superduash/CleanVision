@@ -48,7 +48,7 @@ export function FloatingStatusButton({ status, onClick, visible }: FloatingStatu
           exit={{ y: 50, opacity: 0 }}
           whileTap={{ scale: 0.95 }}
           onClick={onClick}
-          className={`floating-status fixed z-30 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] md:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-[var(--shadow-md)] ${bg} ${text} font-medium text-sm`}
+          className={`floating-status fixed z-30 bottom-[calc(env(safe-area-inset-bottom,0px)+5rem)] md:bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-md ${bg} ${text} font-medium text-sm`}
           style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom, 0px))' }} // Extra safety for floating on mobile
         >
           {icon}

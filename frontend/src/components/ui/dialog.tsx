@@ -62,8 +62,8 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
               'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2',
-              'w-full max-w-lg bg-[var(--surface)] shadow-[var(--shadow-lg)]',
-              'rounded-[var(--radius-xl)] border border-[var(--border-subtle)]',
+              'w-full max-w-lg bg-surface shadow-lg',
+              'rounded-xl border border-border-subtle',
               'flex flex-col max-h-[90vh]',
               className,
             )}
@@ -72,7 +72,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
               <h2
                 id="dialog-title"
-                className="text-h3 text-[var(--text-primary)]"
+                className="text-h3 text-text-primary"
               >
                 {title}
               </h2>
@@ -81,10 +81,10 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
                 aria-label="Close dialog"
                 className={cn(
                   'w-8 h-8 flex items-center justify-center',
-                  'rounded-[var(--radius-md)] text-[var(--text-secondary)]',
-                  'hover:bg-[var(--border-subtle)] hover:text-[var(--text-primary)]',
-                  'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]',
-                  'transition-colors duration-[var(--duration-fast)]',
+                  'rounded-md text-text-secondary',
+                  'hover:bg-[var(--border-subtle)] hover:text-text-primary',
+                  'focus-visible:outline-none focus-visible:shadow-glow-focus',
+                  'transition-colors duration-fast',
                 )}
               >
                 <X size={18} aria-hidden="true" />

@@ -26,24 +26,24 @@ export function useToast() {
 
 const typeConfig: Record<ToastType, { icon: React.ReactNode; bg: string; border: string }> = {
   success: {
-    icon: <CheckCircle2 size={16} className="text-[var(--brand-teal)]" aria-hidden="true" />,
-    bg: 'bg-[var(--surface)]',
+    icon: <CheckCircle2 size={16} className="text-brand-teal" aria-hidden="true" />,
+    bg: 'bg-surface',
     border: 'border-[var(--brand-teal-tint)]',
   },
   error: {
-    icon: <XCircle size={16} className="text-[var(--status-dirty)]" aria-hidden="true" />,
-    bg: 'bg-[var(--surface)]',
-    border: 'border-[var(--status-dirty-tint)]',
+    icon: <XCircle size={16} className="text-status-dirty" aria-hidden="true" />,
+    bg: 'bg-surface',
+    border: 'border-status-dirty-tint',
   },
   warning: {
-    icon: <AlertTriangle size={16} className="text-[var(--status-attention)]" aria-hidden="true" />,
-    bg: 'bg-[var(--surface)]',
-    border: 'border-[var(--status-attention-tint)]',
+    icon: <AlertTriangle size={16} className="text-status-attention" aria-hidden="true" />,
+    bg: 'bg-surface',
+    border: 'border-status-attention-tint',
   },
   info: {
-    icon: <Info size={16} className="text-[var(--status-info)]" aria-hidden="true" />,
-    bg: 'bg-[var(--surface)]',
-    border: 'border-[var(--status-info-tint)]',
+    icon: <Info size={16} className="text-status-info" aria-hidden="true" />,
+    bg: 'bg-surface',
+    border: 'border-status-info-tint',
   },
 };
 
@@ -73,7 +73,7 @@ function ToastItem({
       aria-live="polite"
       className={cn(
         'relative flex items-start gap-3 px-4 py-3',
-        'rounded-[var(--radius-lg)] border shadow-[var(--shadow-md)]',
+        'rounded-lg border shadow-md',
         'min-w-[260px] max-w-[360px]',
         config.bg,
         config.border,
@@ -81,14 +81,14 @@ function ToastItem({
       )}
     >
       <span className="mt-0.5 shrink-0">{config.icon}</span>
-      <p className="text-sm text-[var(--text-primary)] flex-1">{t.message}</p>
+      <p className="text-sm text-text-primary flex-1">{t.message}</p>
       <button
         onClick={() => onDismiss(t.id)}
         aria-label="Dismiss notification"
         className={cn(
-          'shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]',
-          'transition-colors duration-[var(--duration-fast)]',
-          'focus-visible:outline-none focus-visible:shadow-[var(--glow-focus)]',
+          'shrink-0 text-text-tertiary hover:text-text-primary',
+          'transition-colors duration-fast',
+          'focus-visible:outline-none focus-visible:shadow-glow-focus',
           'rounded-sm',
         )}
       >

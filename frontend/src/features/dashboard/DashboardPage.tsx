@@ -12,6 +12,10 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/badge';
 import { StaffChip } from '@/components/composite/StaffChip';
 import type { Room } from '@/lib/api/types';
+import { StatCard } from '@/components/composite/StatCard';
+import { Activity, AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
+
+
 
 export default function DashboardPage() {
   const { staffName } = useStaffNameStore();
@@ -22,10 +26,19 @@ export default function DashboardPage() {
   const [isAddRoomOpen, setIsAddRoomOpen] = useState(false);
 
   // Group rooms by block and filter
-  const { groupedRooms, allBlocks } = useMemo(() => {
-    if (!rooms) return { groupedRooms: {}, allBlocks: [] };
+  const { groupedRooms, allBlocks, stats } = useMemo(() => {
+    if (!rooms) return { groupedRooms: {}, allBlocks: [], stats: { total: 0, clean: 0, attention: 0, avgScore: null as number | null } };
+
+    let clean = 0;
+    let attention = 0;
+    let scoreSum = 0;
+    let scoreCount = 0;
 
     const filtered = (rooms || []).filter(room => {
+      if (room.latest_status === 'clean') clean++;
+      else if (room.latest_status === 'needs_attention' || room.latest_status === 'dirty') attention++;
+      if (room.latest_score != null) { scoreSum += room.latest_score; scoreCount++; }
+
       const matchesSearch = room.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             room.block.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesBlock = activeBlocks.size === 0 || activeBlocks.has(room.block);
@@ -39,15 +52,17 @@ export default function DashboardPage() {
 
     // Sort blocks alphabetically
     const sortedGroups = Object.keys(grouped).sort().reduce((acc, key) => {
-      // Sort rooms within block by name
       acc[key] = (grouped[key] || []).sort((a, b) => a.name.localeCompare(b.name));
       return acc;
     }, {} as Record<string, Room[]>);
 
-    // Extract all unique blocks from ALL rooms (ignoring search) for the filter chips
     const blocks = Array.from(new Set((rooms || []).map(r => r.block))).sort();
 
-    return { groupedRooms: sortedGroups, allBlocks: blocks };
+    return { 
+      groupedRooms: sortedGroups, 
+      allBlocks: blocks,
+      stats: { total: rooms.length, clean, attention, avgScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount * 10) / 10 : null }
+    };
   }, [rooms, searchQuery, activeBlocks]);
 
   const toggleBlockFilter = (block: string) => {
@@ -67,7 +82,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-10 w-full pb-24 md:pb-12">
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -75,7 +90,7 @@ export default function DashboardPage() {
             {getGreeting()}, {staffName.split(' ')[0]}
           </h1>
           <p className="text-body text-text-secondary mt-1">
-            Ready for your rounds?
+            Here's the current state of your facility.
           </p>
         </div>
         
@@ -87,20 +102,47 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* Hero Stats */}
+      {!isLoading && !isError && rooms && rooms.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard 
+            label="Total Rooms" 
+            value={stats.total} 
+            icon={<Activity size={20} />} 
+          />
+          <StatCard 
+            label="Need Attention" 
+            value={stats.attention} 
+            icon={<AlertTriangle size={20} className={stats.attention > 0 ? "text-status-attention" : ""} />} 
+            trend={stats.attention > 0 ? "down" : undefined}
+          />
+          <StatCard 
+            label="Clean" 
+            value={stats.clean} 
+            icon={<CheckCircle size={20} className="text-status-clean" />} 
+          />
+          <StatCard 
+            label="Avg Score" 
+            value={stats.avgScore != null ? `${stats.avgScore}` : '—'} 
+            icon={<BarChart2 size={20} />} 
+          />
+        </div>
+      )}
+
       {/* Tools: Search & Filter */}
-      <div className="flex flex-col gap-4 sticky top-0 z-10 bg-canvas py-2">
-        <div className="relative">
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center sticky top-0 z-10 bg-canvas py-2">
+        <div className="relative w-full max-w-md">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
           <Input 
             placeholder="Search rooms..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 w-full"
           />
         </div>
 
         {allBlocks.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto w-full md:w-auto scrollbar-hide pb-2 md:pb-0">
             {allBlocks.map(block => (
               <Chip
                 key={block}

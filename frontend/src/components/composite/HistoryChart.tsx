@@ -27,8 +27,8 @@ export function HistoryChart({ data }: HistoryChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div className="h-48 w-full flex items-center justify-center bg-[var(--surface-raised)] rounded-[var(--radius-md)]">
-        <span className="text-[var(--text-tertiary)] text-sm">Not enough data to chart</span>
+      <div className="h-48 w-full flex items-center justify-center bg-surface-raised rounded-md">
+        <span className="text-text-tertiary text-sm">Not enough data to chart</span>
       </div>
     );
   }
@@ -38,8 +38,8 @@ export function HistoryChart({ data }: HistoryChartProps) {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-[var(--surface)] border border-[var(--border-subtle)] p-2 rounded-[var(--radius-sm)] shadow-[var(--shadow-md)]">
-          <p className="text-xs text-[var(--text-secondary)] mb-1">{data.displayDate}</p>
+        <div className="bg-surface border border-border-subtle p-2 rounded-sm shadow-md">
+          <p className="text-xs text-text-secondary mb-1">{data.displayDate}</p>
           <p className="text-sm font-bold text-mono">
             Score: {payload[0].value.toFixed(1)}
           </p>

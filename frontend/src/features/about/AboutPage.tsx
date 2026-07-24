@@ -11,28 +11,28 @@ export default function AboutPage() {
       <header className="flex items-center gap-4">
         <button 
           onClick={() => navigate(-1)}
-          className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--surface)] border border-[var(--border-subtle)] hover:bg-[var(--surface-raised)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-teal-tint)]"
+          className="w-10 h-10 rounded-full flex items-center justify-center bg-surface border border-border-subtle hover:bg-surface-raised transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal-tint"
         >
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-h1 font-bold text-[var(--text-primary)]">About CleanVision</h1>
+          <h1 className="text-h1 font-bold text-text-primary">About CleanVision</h1>
         </div>
       </header>
 
-      <div className="bg-[var(--surface)] border border-[var(--border-subtle)] rounded-[var(--radius-lg)] p-8 text-center flex flex-col items-center">
-        <div className="w-20 h-20 bg-[var(--brand-teal-tint)] rounded-full flex items-center justify-center text-[var(--brand-teal)] mb-6 shadow-sm">
+      <div className="bg-surface border border-border-subtle rounded-lg p-8 text-center flex flex-col items-center">
+        <div className="w-20 h-20 bg-brand-teal-tint rounded-full flex items-center justify-center text-brand-teal mb-6 shadow-sm">
           <Sparkles size={40} />
         </div>
         
-        <h2 className="text-display-lg font-bold tracking-tight text-[var(--text-primary)] mb-2">
+        <h2 className="text-display-lg font-bold tracking-tight text-text-primary mb-2">
           CleanVision
         </h2>
-        <p className="text-body text-[var(--text-secondary)] mb-8 max-w-md">
+        <p className="text-body text-text-secondary mb-8 max-w-md">
           Version 2.0.0
         </p>
         
-        <p className="text-body text-[var(--text-primary)] mb-8 max-w-md">
+        <p className="text-body text-text-primary mb-8 max-w-md">
           CleanVision uses advanced computer vision to ensure hospital environments meet the highest standards of cleanliness. Built with React 19, Vite, and Tailwind v4.
         </p>
 
