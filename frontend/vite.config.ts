@@ -1,10 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import viteCompression from "vite-plugin-compression";
 import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteCompression({ algorithm: "gzip" }),
+    viteCompression({ algorithm: "brotliCompress", ext: ".br" }),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -13,8 +18,6 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Forwards /api/* and /uploads/* to the local Flask backend in development.
-      // In production, VITE_API_BASE_URL points directly at the Render URL instead.
       "/api": {
         target: "http://localhost:5000",
         changeOrigin: true,
@@ -26,11 +29,16 @@ export default defineConfig({
     },
   },
   build: {
-    // Generate a manifest for cache-busting on Vercel
     manifest: true,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+      },
+    },
     rollupOptions: {
       output: {
-        // Split vendor chunks for better long-term caching
         manualChunks(id) {
           if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
             return "react";

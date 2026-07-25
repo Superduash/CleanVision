@@ -12,7 +12,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
-      staleTime: 30_000,
+      staleTime: 60_000,
+      gcTime: 10 * 60 * 1000, // Keep data in memory for 10 minutes
     },
   },
 });

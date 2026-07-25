@@ -273,7 +273,7 @@ export function LandingPage() {
               <Button
                 size="lg"
                 variant="secondary"
-                className="border-0 bg-white text-primary shadow-raised hover:bg-white/90"
+                className="border-0 bg-white text-blue-600 shadow-raised hover:bg-white/90"
               >
                 Get started free <ArrowRight className="h-4 w-4" />
               </Button>

@@ -1,9 +1,16 @@
-import { NavLink, Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { LayoutGrid, ScanLine, History, BarChart2, Bell, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
-const ADMIN_ITEMS = [
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ElementType;
+  primary?: boolean;
+}
+
+const ADMIN_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutGrid },
   { to: "/dashboard/scan", label: "Scan", icon: ScanLine, primary: true },
   { to: "/dashboard/history", label: "History", icon: History },
@@ -11,7 +18,7 @@ const ADMIN_ITEMS = [
   { to: "/dashboard/notifications", label: "Alerts", icon: Bell },
 ];
 
-const PATIENT_ITEMS = [
+const PATIENT_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Rooms", icon: ClipboardList },
   { to: "/dashboard/notifications", label: "Alerts", icon: Bell },
   { to: "/dashboard/profile", label: "Profile", icon: LayoutGrid },
@@ -20,7 +27,7 @@ const PATIENT_ITEMS = [
 export function BottomNav() {
   const { session } = useAuth();
   const isAdmin = session?.role === "admin";
-  const items = isAdmin ? ADMIN_ITEMS : PATIENT_ITEMS;
+  const items: NavItem[] = isAdmin ? ADMIN_ITEMS : PATIENT_ITEMS;
 
   return (
     <nav

@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
+from flask_compress import Compress
+from flask_caching import Cache
 
 import database
 import model
@@ -17,6 +19,12 @@ import model
 load_dotenv()
 
 app = Flask(__name__)
+
+# Initialize Compression (Gzip/Deflate)
+Compress(app)
+
+# Initialize Caching (In-memory SimpleCache)
+cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
 # --------------------------------------------------------------------------- #
 # Configuration                                                                 #
@@ -85,6 +93,7 @@ def create_room():
 
 
 @app.route("/api/rooms", methods=["GET"])
+@cache.cached(timeout=15, query_string=True)
 def get_rooms():
     """Return all rooms with their latest scan info."""
     try:
@@ -212,6 +221,7 @@ def health_check():
 
 
 @app.route("/api/reports/summary", methods=["GET"])
+@cache.cached(timeout=60, query_string=True)
 def reports_summary():
     """Aggregate cleanliness stats across all rooms for the Reports screen."""
     try:
