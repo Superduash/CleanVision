@@ -1,30 +1,40 @@
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import { Providers } from './app/providers';
-import { AppRouter } from './app/router';
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "sonner";
+import { App } from "./App";
+import { AuthContext, useProvideAuth } from "@/hooks/useAuth";
+import { ThemeProvider } from "@/hooks/useTheme";
+import "./styles/globals.css";
 
-// Global styles
-import './styles/globals.css';
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
-// Pre-initialize stores if needed
-import '@/lib/stores/themeStore';
-import '@/lib/stores/offlineQueueStore';
-
-const rootEl = document.getElementById('root');
-if (!rootEl) throw new Error('Root element not found');
-
-createRoot(rootEl).render(
-  <React.StrictMode>
-    <Providers>
-      <AppRouter />
-    </Providers>
-  </React.StrictMode>
-);
-
-// PWA Service Worker Registration
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    // Vite-PWA auto-injects the service worker here during build
-    // For dev, it uses a mock or loads a dev SW
-  });
+function Root() {
+  const auth = useProvideAuth();
+  return (
+    <AuthContext.Provider value={auth}>
+      <App />
+    </AuthContext.Provider>
+  );
 }
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <Root />
+        </BrowserRouter>
+        <Toaster position="top-right" richColors closeButton />
+      </QueryClientProvider>
+    </ThemeProvider>
+  </StrictMode>,
+);

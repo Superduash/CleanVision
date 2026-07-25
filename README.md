@@ -8,11 +8,9 @@ A full-stack web app for monitoring hospital room cleanliness using AI-powered i
 ┌─────────────────────────────────────────────────┐
 │                 CleanVision App                 │
 │                                                 │
-│  ┌──────────────┐       ┌─────────────────────┐ │
-│  │  React UI    │       │  Flask Backend      │ │
-│  │  (Frontend)  │──────>│  (API + Static)     │ │
-│  │              │  /api │                     │ │
-│  └──────────────┘       │  ┌───────────────┐  │ │
+│  ┌─────────────────────────┐                            │
+│  │  Client Application     │                            │
+│  └─────────────────────────┘                            │
 │                         │  │  SQLite DB    │  │ │
 │                         │  │  (rooms+scans)│  │ │
 │                         │  └───────────────┘  │ │
@@ -61,38 +59,16 @@ python backend/app.py
 
 The API will start on `http://localhost:5000`.
 
-### Frontend Setup
 
-```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Create .env file for dev
-cp .env.example .env
-
-# Start the dev server
-npm start
-```
-
-The React app will start on `http://localhost:3000` and proxy API requests to the Flask backend.
 
 ## Production Build & Deploy
 
 ### Single-Service Deploy (Recommended)
 
-This app is designed as a single Python service — Flask serves both the API and the built React frontend.
+This app is designed as a Python API service.
 
 ```bash
-# 1. Build the frontend
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 2. Deploy the entire repo as a Python service
+# Deploy the repo as a Python service
 #    - On Render/Railway: use the Procfile
 #    - On Heroku: `git push heroku main`
 #    - The Procfile runs: gunicorn --chdir backend app:app
@@ -113,7 +89,6 @@ The app ships without a trained AI model. When `backend/cleanliness_model.h5` is
 
 - The backend runs in **Mock Mode** with hash-based stable scores (same image → same score every time)
 - All features work: rooms, baselines, scans, history, alerts
-- The frontend shows a yellow "Mock prediction — model not yet trained" badge on scan results
 - **No code changes needed** — just drop in the trained `.h5` file later and restart
 
 ### Training Your Model
@@ -130,12 +105,7 @@ CleanVision/
 │   ├── database.py         # SQLite database functions
 │   ├── requirements.txt    # Python dependencies
 │   └── uploads/            # Image uploads (gitignored)
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx         # React Router setup
-│   │   ├── pages/          # Page components
-│   │   └── components/     # Reusable UI components
-│   └── ...
+
 ├── colab_training/
 │   └── train.ipynb         # Colab notebook for model training
 ├── data/                   # Training data (upload to Drive)
@@ -147,10 +117,7 @@ CleanVision/
 
 ### Production Topology (Recommended)
 
-- **Frontend → Vercel** (instant CDN, free tier, automatic preview deploys on every push)
 - **Backend API → Render** (free tier, auto-deploys from `backend/` directory)
-
-This is the canonical deploy path. The Flask backend can *also* serve the built React app via its catch-all route, but that's an alternative development convenience — do not use it as the primary production setup.
 
 ### Step-by-step
 
@@ -161,14 +128,10 @@ This is the canonical deploy path. The Flask backend can *also* serve the built 
 3. Set **Start Command**: `gunicorn app:app --timeout 90 --workers 2` (the `Procfile` sets this automatically)
 4. **⚠️ Add a Persistent Disk**: Mount a disk at `/opt/render/project/src/uploads` (or wherever `UPLOAD_FOLDER` resolves). Without this, every redeploy wipes all uploaded room baseline images and scan history — rooms will still exist in the database but their images will 404. The database file should also live on the persistent disk; set `DATABASE_PATH` env var to a path on the disk.
 5. Set environment variables:
-   - `ALLOWED_ORIGINS` → your Vercel frontend URL (e.g. `https://cleanvision.vercel.app`) — **never leave this as `*` in production**
+   - `ALLOWED_ORIGINS` → your client URL (e.g. `https://cleanvision.vercel.app`) — **never leave this as `*` in production**
    - `FLASK_DEBUG` → `false`
 
-**2. Deploy frontend on Vercel**
 
-1. Import the repo on Vercel, set root directory to `frontend/`.
-2. Set environment variable: `VITE_API_BASE_URL` → your Render backend URL (e.g. `https://cleanvision-api.onrender.com`)
-3. Vercel will auto-build with `npm run build` and deploy.
 
 ### Cold-start note
 
@@ -196,9 +159,7 @@ SQLite + local `uploads/` are both ephemeral on Render without a persistent disk
 - **AI Model**: ResNet-18 / MobileNetV2 (TensorFlow/Keras .h5)
 - **Backend**: Python + Flask + flask-cors + Gunicorn
 - **Database**: SQLite (zero setup for dev; add Render Persistent Disk for prod)
-- **Frontend**: React 19 + TypeScript + Tailwind v4 + TanStack Query + motion.dev
-- **PWA**: Workbox service worker via vite-plugin-pwa
-- **Deployment**: Vercel (frontend) + Render (backend API)
+- **Deployment**: Render (backend API)
 
 ## License
 

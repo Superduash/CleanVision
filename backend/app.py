@@ -35,10 +35,6 @@ BASELINES_FOLDER = os.path.join(UPLOAD_FOLDER, "baselines")
 SCANS_FOLDER = os.path.join(UPLOAD_FOLDER, "scans")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
-FRONTEND_BUILD = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-)
-
 
 # --------------------------------------------------------------------------- #
 # Helpers                                                                       #
@@ -211,7 +207,7 @@ def get_history(room_id):
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    """Health check endpoint. Used by frontend and deploy monitors."""
+    """Health check endpoint. Used by deploy monitors."""
     return jsonify({"status": "ok", "mock_mode": model.MOCK_MODE}), 200
 
 
@@ -242,31 +238,9 @@ def serve_upload(filename):
     requested = os.path.realpath(os.path.join(UPLOAD_FOLDER, filename))
     if not requested.startswith(safe_uploads + os.sep):
         return jsonify({"error": "Forbidden"}), 403
-    return send_from_directory(UPLOAD_FOLDER, filename, max_age=31536000)
-
-
-# --------------------------------------------------------------------------- #
-# React Frontend (production static serving)                                    #
-# Must be defined AFTER all /api/* and /uploads/* routes.                       #
-# --------------------------------------------------------------------------- #
-
-@app.route("/", defaults={"path": ""})
-@app.route("/<path:path>")
-def serve_react(path):
-    """Serve the built React app for any non-API route (production mode)."""
-    # Serve any static asset that physically exists inside the build folder
-    if path:
-        target = os.path.normpath(os.path.join(FRONTEND_BUILD, path))
-        # Guard against path traversal
-        if target.startswith(os.path.normpath(FRONTEND_BUILD)) and os.path.isfile(target):
-            directory = os.path.dirname(target)
-            filename  = os.path.basename(target)
-            return send_from_directory(directory, filename)
-    # For all React Router paths (and root), serve index.html
-    index_path = os.path.join(FRONTEND_BUILD, "index.html")
-    if os.path.exists(index_path):
-        return send_from_directory(FRONTEND_BUILD, "index.html")
-    return jsonify({"status": "CleanVision API running", "note": "Frontend build not found"}), 200
+    response = send_from_directory(UPLOAD_FOLDER, filename, max_age=31536000)
+    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 
 # --------------------------------------------------------------------------- #

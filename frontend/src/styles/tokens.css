@@ -1,140 +1,88 @@
-/* ============================================================================
-   CleanVision Design Tokens
-   Verbatim from UIPrompt.md §3 — do not modify these values arbitrarily.
-   ============================================================================ */
+/*
+  CleanVision design tokens
+  ─────────────────────────
+  Color story: hospitals already use blue-violet germicidal (UV-C) light as the
+  visual signal for "this surface is being checked / sanitized." CleanVision's
+  accent color borrows that same blue-violet glow for anything related to an
+  active scan, so the product's core action visually rhymes with the real-world
+  behavior it's modeling. The primary brand blue stays a calmer, more clinical
+  blue reserved for navigation and structure, so the violet accent doesn't get
+  diluted by overuse.
+
+  Status colors (success/warning/danger = clean/needs_attention/dirty) are kept
+  fully independent from both the primary and accent hues so a room's status is
+  never ambiguous next to UI chrome.
+
+  All values are R G B triplets (no `rgb()` wrapper) so Tailwind can apply
+  alpha via `rgb(var(--x) / <alpha-value>)`.
+*/
 
 :root {
-  /* ---- Light mode (default) ---- */
-  --canvas: #F8F6F2;
-  --surface: #FFFFFF;
-  --surface-raised: #FFFFFF;
-  --border-subtle: #E8E4DC;
-  --border-strong: #D8D2C6;
+  /* Base neutrals */
+  --color-ink: 11 18 32;               /* #0B1220 */
+  --color-bg: 247 248 251;             /* #F7F8FB */
+  --color-surface: 255 255 255;        /* #FFFFFF */
+  --color-surface-raised: 255 255 255; /* #FFFFFF, distinguished via shadow not fill in light mode */
+  --color-border: 226 230 238;         /* #E2E6EE */
 
-  --text-primary: #171A1C;
-  --text-secondary: #5B6167;
-  --text-tertiary: #8A8F94;
+  --color-text-primary: 15 23 42;      /* #0F172A */
+  --color-text-muted: 100 112 134;     /* #647086 */
+  --color-text-disabled: 170 178 194;  /* #AAB2C2 */
 
-  --brand-teal: #0E6E72;
-  --brand-teal-hover: #0A585B;
-  --brand-teal-tint: #E3F1F0;
+  /* Brand: clinical blue */
+  --color-primary: 30 78 216;          /* #1E4ED8 */
+  --color-primary-hover: 24 64 181;    /* #1840B5 */
+  --color-primary-active: 19 51 145;   /* #133391 */
 
-  --accent-violet: #6D5EF0;
-  --accent-violet-tint: #EEEBFE;
+  /* Signature accent: germicidal UV blue-violet, reserved for scan/active states */
+  --color-accent: 109 74 242;          /* #6D4AF2 */
+  --color-accent-hover: 92 55 227;     /* #5C37E3 */
 
-  --status-clean: #157F45;
-  --status-clean-tint: #E3F6EC;
-  --status-attention: #B45309;
-  --status-attention-tint: #FCF0DC;
-  --status-dirty: #C22F2F;
-  --status-dirty-tint: #FBE7E7;
-  --status-info: #2A5DB0;
-  --status-info-tint: #E7EFFB;
+  /* Status: clean / needs_attention / dirty */
+  --color-success: 21 128 61;          /* #15803D */
+  --color-success-bg: 220 245 227;     /* #DCF5E3 */
+  --color-warning: 161 87 0;           /* #A15700 */
+  --color-warning-bg: 254 236 199;     /* #FEECC7 */
+  --color-danger: 190 33 49;           /* #BE2131 */
+  --color-danger-bg: 252 222 226;      /* #FCDEE2 */
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-
-  --shadow-sm: 0 1px 2px rgba(23,26,28,0.04), 0 1px 1px rgba(23,26,28,0.03);
-  --shadow-md: 0 4px 12px rgba(23,26,28,0.06), 0 2px 4px rgba(23,26,28,0.04);
-  --shadow-lg: 0 12px 32px rgba(23,26,28,0.10), 0 4px 8px rgba(23,26,28,0.04);
-  --glow-focus: 0 0 0 3px var(--brand-teal-tint);
-
-  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --duration-instant: 90ms;
-  --duration-fast: 150ms;
-  --duration-base: 250ms;
-  --duration-slow: 400ms;
-  --duration-hero: 600ms;
-
-  /* ---- Safe area tokens ---- */
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
-
-  /* ---- Viewport height (100dvh with fallback) ---- */
-  --viewport-height: 100vh;
+  --color-focus: 109 74 242;           /* same family as accent for visible focus rings */
 }
 
-@supports (height: 100dvh) {
-  :root {
-    --viewport-height: 100dvh;
-  }
-}
+/*
+  Dark theme — not an inversion. Each value is independently chosen for
+  contrast, readability, and vibrancy in a dark context.
+  Primary chrome goes dark-blue/navy; surfaces use layered dark slates;
+  status colors are lightened/saturated so they remain readable against dark bg.
+*/
+.dark {
+  /* Base neutrals */
+  --color-ink: 248 250 255;            /* almost-white for ink-on-dark */
+  --color-bg: 10 13 22;               /* #0A0D16 — deep navy-black */
+  --color-surface: 17 22 38;          /* #111626 — card surface */
+  --color-surface-raised: 24 30 52;   /* #181E34 — elevated card */
+  --color-border: 38 47 76;           /* #262F4C — subtle dividers */
 
-/* ---- Dark mode ---- */
-[data-theme="dark"] {
-  --canvas: #0B0D0F;
-  --surface: #15181B;
-  --surface-raised: #1C2023;
-  --border-subtle: rgba(255,255,255,0.07);
-  --border-strong: rgba(255,255,255,0.14);
+  --color-text-primary: 235 240 255;  /* #EBF0FF — near white with blue tint */
+  --color-text-muted: 130 145 185;    /* #8291B9 — readable muted */
+  --color-text-disabled: 65 78 115;   /* #414E73 */
 
-  --text-primary: #F3F5F5;
-  --text-secondary: #9CA3A8;
-  --text-tertiary: #6E7378;
+  /* Brand: primary blue brightened for dark bg */
+  --color-primary: 99 130 255;        /* #6382FF */
+  --color-primary-hover: 120 148 255; /* #7894FF */
+  --color-primary-active: 79 110 245; /* #4F6EF5 */
 
-  --brand-teal: #2FD1C6;
-  --brand-teal-hover: #57DED4;
-  --brand-teal-tint: rgba(47,209,198,0.12);
+  /* Accent: same UV-violet, slightly brighter in dark */
+  --color-accent: 139 101 255;        /* #8B65FF */
+  --color-accent-hover: 159 121 255;  /* #9F79FF */
 
-  --accent-violet: #9B8CFF;
-  --accent-violet-tint: rgba(155,140,255,0.14);
+  /* Status: lightened for dark backgrounds, WCAG AA contrast maintained */
+  --color-success: 52 199 109;        /* #34C76D */
+  --color-success-bg: 10 46 26;       /* #0A2E1A */
+  --color-warning: 251 161 38;        /* #FBA126 */
+  --color-warning-bg: 46 28 0;        /* #2E1C00 */
+  --color-danger: 255 99 112;         /* #FF6370 */
+  --color-danger-bg: 60 10 16;        /* #3C0A10 */
 
-  --status-clean: #3FCB80;
-  --status-clean-tint: rgba(63,203,128,0.14);
-  --status-attention: #F0A93F;
-  --status-attention-tint: rgba(240,169,63,0.14);
-  --status-dirty: #F1665F;
-  --status-dirty-tint: rgba(241,102,95,0.14);
-  --status-info: #6FA3F5;
-  --status-info-tint: rgba(111,163,245,0.14);
-
-  /* dark mode uses borders + subtle glow instead of shadows */
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
-  --border-elevated: 1px solid var(--border-strong);
-}
-
-@theme {
-  --color-canvas: var(--canvas);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-border-subtle: var(--border-subtle);
-  --color-border-strong: var(--border-strong);
-
-  --color-text-primary: var(--text-primary);
-  --color-text-secondary: var(--text-secondary);
-  --color-text-tertiary: var(--text-tertiary);
-
-  --color-brand-teal: var(--brand-teal);
-  --color-brand-teal-hover: var(--brand-teal-hover);
-  --color-brand-teal-tint: var(--brand-teal-tint);
-
-  --color-accent-violet: var(--accent-violet);
-  --color-accent-violet-tint: var(--accent-violet-tint);
-
-  --color-status-clean: var(--status-clean);
-  --color-status-clean-tint: var(--status-clean-tint);
-  --color-status-attention: var(--status-attention);
-  --color-status-attention-tint: var(--status-attention-tint);
-  --color-status-dirty: var(--status-dirty);
-  --color-status-dirty-tint: var(--status-dirty-tint);
-  --color-status-info: var(--status-info);
-  --color-status-info-tint: var(--status-info-tint);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-glow-focus: var(--glow-focus);
+  --color-focus: 139 101 255;         /* matches dark accent */
 }
