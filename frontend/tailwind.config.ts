@@ -42,7 +42,7 @@ export default {
         DEFAULT: "10px",
         lg: "14px",
         xl: "20px",
-        "2xl": "28px",
+        "2xl": "24px",
       },
       boxShadow: {
         // Subtle card depth
@@ -73,12 +73,27 @@ export default {
           "0%":   { opacity: "0", transform: "scale(0.95)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "accordion-down": {
+          from: { height: "0", opacity: "0" },
+          to: { height: "var(--radix-accordion-content-height, auto)", opacity: "1" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height, auto)", opacity: "1" },
+          to: { height: "0", opacity: "0" },
+        },
       },
       animation: {
         "ring-sweep": "ring-sweep 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards",
         "fade-up":    "fade-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards",
         "fade-in":    "fade-in 0.25s ease forwards",
         "scale-in":   "scale-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "float":      "float 6s ease-in-out infinite",
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
       },
     },
   },

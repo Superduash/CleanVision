@@ -1,15 +1,86 @@
-# CleanVision — Hospital Cleanliness Monitor
+<div align="center">
+  <img src="frontend/public/logo.png" alt="CleanVision Logo" width="80" />
+  <h1>CleanVision</h1>
+  <p><strong>AI-powered cleanliness monitoring for modern healthcare facilities.</strong></p>
 
-A full-stack web app for monitoring hospital room cleanliness using AI-powered image analysis.
+  <p>Move from guesswork to verified standards with real-time image analysis, full audit trails, and automated alerts.</p>
 
-## Architecture
+  <p>
+    <img alt="License" src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" />
+    <img alt="Python" src="https://img.shields.io/badge/Python-3.11+-3776AB.svg?style=flat-square&logo=python&logoColor=white" />
+    <img alt="React" src="https://img.shields.io/badge/React-18-61DAFB.svg?style=flat-square&logo=react&logoColor=black" />
+    <img alt="Tailwind" src="https://img.shields.io/badge/Tailwind-CSS-38B2AC.svg?style=flat-square&logo=tailwind-css&logoColor=white" />
+  </p>
+</div>
 
+---
+
+## ⚡ Features
+
+- **Baseline Architecture** — Register a room with a single reference photo. Every scan is measured against that precise baseline, not a generic standard.
+- **Real-time AI Scoring** — Upload a photo and receive an immediate 0–100 cleanliness score with a clear status read.
+- **Priority Dashboard** — Rooms are sorted by risk, automatically surfacing areas that need attention first.
+- **Immutable Audit Trail** — Every scan is logged. Pull full histories for incident reviews or trend analysis.
+- **Mock Mode** — Drop-in ready. Runs perfectly with a stable mock model before you deploy your own trained TensorFlow weights.
+
+## 📊 Scoring System
+
+| Score Range | Status | Color | Action |
+|-------------|--------|-------|--------|
+| **70–100** | `clean` | 🟢 Green | No action needed |
+| **40–69** | `needs_attention` | 🟡 Amber | Monitor closely |
+| **0–39** | `dirty` | 🔴 Red | ⚠️ **Alert**: Area requires cleaning |
+
+## 🛠 Tech Stack
+
+- **Frontend**: React 18, TypeScript, Tailwind CSS, Vite
+- **Backend**: Python, Flask, Gunicorn
+- **AI/ML**: TensorFlow / Keras (MobileNetV2 architecture)
+- **Database**: SQLite (Zero config development)
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- npm or yarn
+
+### 1. Frontend Setup
+```bash
+cd frontend
+npm install
+npm run dev
 ```
+*Frontend runs at `http://localhost:5173`*
+
+### 2. Backend Setup
+```bash
+cd backend
+pip install -r requirements.txt
+python app.py
+```
+*API runs at `http://localhost:5000`*
+
+## 🤖 AI Model & Mock Mode
+
+CleanVision ships with a sophisticated **Mock Mode** out of the box. 
+
+If `backend/cleanliness_model.h5` is not present, the backend falls back to a deterministic hash-based scoring system. 
+- **Stable outputs**: The same image always produces the same score.
+- **Full feature parity**: Rooms, baselines, scans, and histories work seamlessly.
+- **Zero code changes**: Simply drop your trained `.h5` model into the backend folder, and the system automatically switches to real AI inference.
+
+### Training Your Own Model
+Use `colab_training/train.ipynb` on Google Colab (with free GPU support) to train MobileNetV2 on your specific facility images. 
+
+## 🏗 Architecture
+
+```text
 ┌─────────────────────────────────────────────────┐
 │                 CleanVision App                 │
 │                                                 │
 │  ┌─────────────────────────┐                            │
-│  │  Client Application     │                            │
+│  │  React Frontend         │                            │
 │  └─────────────────────────┘                            │
 │                         │  │  SQLite DB    │  │ │
 │                         │  │  (rooms+scans)│  │ │
@@ -23,125 +94,19 @@ A full-stack web app for monitoring hospital room cleanliness using AI-powered i
 └─────────────────────────────────────────────────┘
 ```
 
-## Features
+## 🌐 Production Deployment
 
-- **Room Management** — Register hospital rooms with name, block, and a baseline "clean" photo
-- **AI Scanning** — Upload a photo to get an AI-powered cleanliness score (0–100)
-- **Status Tracking** — Green/Amber/Red status with alerts for dirty areas
-- **Scan History** — Track cleanliness over time per room
-- **Mock Mode** — Full functionality even without a trained model (hash-based stable scores)
+### Recommended Topology
+- **Frontend**: Vercel or Netlify
+- **Backend**: Render (Web Service)
 
-## Scoring Table
+### Backend Deployment (Render)
+1. Point Render to the root repository, specifying `backend/` as the root directory.
+2. Build command: `pip install -r requirements.txt`
+3. Start command: `gunicorn app:app --timeout 90 --workers 2` (or use the included `Procfile`)
+4. **⚠️ Critical Setup**: Add a **Persistent Disk** mounted at `/opt/render/project/src/uploads` to persist baseline photos and scan images across redeploys.
 
-| Score Range | Status | Color | Action |
-|-------------|--------|-------|--------|
-| 70–100 | `clean` | 🟢 Green | No action needed |
-| 40–69 | `needs_attention` | 🟡 Amber | Monitor closely |
-| 0–39 | `dirty` | 🔴 Red | ⚠️ **Alert**: Area requires cleaning |
-
-## Local Development
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 16+
-- npm
-
-### Backend Setup
-
-```bash
-# Install Python dependencies
-pip install -r backend/requirements.txt
-
-# Run the Flask backend
-python backend/app.py
-```
-
-The API will start on `http://localhost:5000`.
-
-
-
-## Production Build & Deploy
-
-### Single-Service Deploy (Recommended)
-
-This app is designed as a Python API service.
-
-```bash
-# Deploy the repo as a Python service
-#    - On Render/Railway: use the Procfile
-#    - On Heroku: `git push heroku main`
-#    - The Procfile runs: gunicorn --chdir backend app:app
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `5000` | Port the server listens on |
-| `FLASK_DEBUG` | `false` | Set to `true` for dev mode |
-| `ALLOWED_ORIGINS` | `*` | Comma-separated list of allowed CORS origins |
-| `REACT_APP_API_BASE` | `/api` | API base URL (only needed in dev) |
-
-## Mock Mode
-
-The app ships without a trained AI model. When `backend/cleanliness_model.h5` is missing:
-
-- The backend runs in **Mock Mode** with hash-based stable scores (same image → same score every time)
-- All features work: rooms, baselines, scans, history, alerts
-- **No code changes needed** — just drop in the trained `.h5` file later and restart
-
-### Training Your Model
-
-Use `colab_training/train.ipynb` on Google Colab (free GPU) to train MobileNetV2 on your own clean/dirty room images. See the notebook for instructions.
-
-## File Structure
-
-```
-CleanVision/
-├── backend/
-│   ├── app.py              # Flask API + static serving
-│   ├── model.py            # AI model loader + mock fallback
-│   ├── database.py         # SQLite database functions
-│   ├── requirements.txt    # Python dependencies
-│   └── uploads/            # Image uploads (gitignored)
-
-├── colab_training/
-│   └── train.ipynb         # Colab notebook for model training
-├── data/                   # Training data (upload to Drive)
-├── Procfile                # Deployment config
-└── runtime.txt             # Python version for hosting
-```
-
-## Deployment
-
-### Production Topology (Recommended)
-
-- **Backend API → Render** (free tier, auto-deploys from `backend/` directory)
-
-### Step-by-step
-
-**1. Deploy backend on Render**
-
-1. Create a new **Web Service** on Render pointing at this repo, root directory `backend/`.
-2. Set **Build Command**: `pip install -r requirements.txt`
-3. Set **Start Command**: `gunicorn app:app --timeout 90 --workers 2` (the `Procfile` sets this automatically)
-4. **⚠️ Add a Persistent Disk**: Mount a disk at `/opt/render/project/src/uploads` (or wherever `UPLOAD_FOLDER` resolves). Without this, every redeploy wipes all uploaded room baseline images and scan history — rooms will still exist in the database but their images will 404. The database file should also live on the persistent disk; set `DATABASE_PATH` env var to a path on the disk.
-5. Set environment variables:
-   - `ALLOWED_ORIGINS` → your client URL (e.g. `https://cleanvision.vercel.app`) — **never leave this as `*` in production**
-   - `FLASK_DEBUG` → `false`
-
-
-
-### Cold-start note
-
-Render free instances spin down after 15 minutes of inactivity. The first request after idle can take **30–60 seconds** while the container boots and TensorFlow loads the model. The UI shows a "Waking up the server…" notice after 5 seconds of a pending request so this doesn't look like a crash.
-
-### Data persistence
-
-SQLite + local `uploads/` are both ephemeral on Render without a persistent disk. **If you skip the disk setup, a redeploy = all rooms and scans disappear.** This will look exactly like the app is broken during a demo. Set up the persistent disk before the first demo.
-
-## API Endpoints
+## 🔌 API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -154,13 +119,6 @@ SQLite + local `uploads/` are both ephemeral on Render without a persistent disk
 | `GET` | `/api/reports/summary` | Aggregate cleanliness stats |
 | `GET` | `/api/health` | Health check |
 
-## Tech Stack
+## 📄 License
 
-- **AI Model**: ResNet-18 / MobileNetV2 (TensorFlow/Keras .h5)
-- **Backend**: Python + Flask + flask-cors + Gunicorn
-- **Database**: SQLite (zero setup for dev; add Render Persistent Disk for prod)
-- **Deployment**: Render (backend API)
-
-## License
-
-MIT
+This project is licensed under the MIT License.

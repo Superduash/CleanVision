@@ -9,16 +9,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  primary: "bg-primary text-white hover:bg-primary-hover active:bg-primary-active shadow-card",
-  secondary: "bg-surface text-text-primary border border-border hover:bg-bg",
+  primary: "bg-gradient-to-b from-primary to-primary-active text-white border border-primary-active/20 hover:shadow-primary-glow",
+  secondary: "bg-transparent text-text-primary border border-border hover:bg-surface-raised hover:border-text-muted/30",
   ghost: "text-text-primary hover:bg-bg",
   danger: "bg-danger text-white hover:brightness-95",
 };
 
 const SIZE_CLASSES: Record<NonNullable<ButtonProps["size"]>, string> = {
-  sm: "h-8 px-3 text-sm gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
-  lg: "h-12 px-6 text-base gap-2",
+  sm: "h-10 px-4 text-sm gap-2",
+  md: "h-12 px-6 text-sm gap-2",
+  lg: "h-14 px-8 text-base gap-2.5",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -28,8 +28,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         disabled={disabled || isLoading}
         className={cn(
-          "inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-150",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          "inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200",
+          "hover:-translate-y-0.5 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none",
           VARIANT_CLASSES[variant],
           SIZE_CLASSES[size],
           className,

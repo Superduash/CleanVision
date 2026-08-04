@@ -60,10 +60,10 @@
 .dark {
   /* ── Neutrals ─────────────────────────────────────────────────── */
   --color-ink: 232 238 255;            /* #E8EEFF — blue-tinted near-white */
-  --color-bg: 6 9 18;                  /* #060912 — deep space black */
-  --color-surface: 13 19 36;           /* #0D1324 — elevated card */
-  --color-surface-raised: 20 28 52;    /* #141C34 — higher elevation */
-  --color-border: 30 40 70;            /* #1E2846 — subtle navy dividers */
+  --color-bg: 11 16 32;                /* #0B1020 — deep layered background */
+  --color-surface: 18 25 43;           /* #12192B — surface card */
+  --color-surface-raised: 22 30 51;    /* #161E33 — elevated surface */
+  --color-border: 31 41 61;            /* #1F293D — subtle border (approx rgba(255,255,255,.08)) */
 
   /* ── Text ─────────────────────────────────────────────────────── */
   --color-text-primary: 228 235 255;   /* #E4EBFF — crisp blue-white */

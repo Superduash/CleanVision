@@ -21,7 +21,20 @@ export function PublicNavbar() {
   const location = useLocation();
 
   // Close mobile menu on route change
-  useEffect(() => { setIsOpen(false); }, [location]);
+  useEffect(() => { 
+    setIsOpen(false); 
+    document.body.style.overflow = "auto";
+  }, [location]);
+
+  // Lock body scroll when mobile menu is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+    return () => { document.body.style.overflow = "auto"; };
+  }, [isOpen]);
 
   // Add blur/shadow on scroll
   useEffect(() => {
@@ -34,31 +47,33 @@ export function PublicNavbar() {
     <>
       <header
         className={cn(
-          "fixed inset-x-0 top-0 z-50 bg-bg/90 backdrop-blur-md transition-all duration-200",
-          scrolled ? "border-b border-border shadow-card" : "border-b border-transparent",
+          "fixed inset-x-0 top-0 z-50 bg-bg/80 backdrop-blur-xl transition-all duration-300",
+          scrolled ? "border-b border-border shadow-sm" : "border-b border-transparent",
         )}
       >
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          {/* Logo + Home */}
-          <Link to="/" aria-label="CleanVision home">
-            <Logo />
-          </Link>
+        <div className="mx-auto flex h-16 lg:h-[72px] max-w-7xl items-center justify-between px-6">
+          {/* Logo */}
+          <div className="flex flex-1 items-center justify-start">
+            <Link to="/" aria-label="CleanVision home">
+              <Logo />
+            </Link>
+          </div>
 
-          {/* Desktop nav */}
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="Site navigation">
+          {/* Desktop nav (Centered) */}
+          <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex" aria-label="Site navigation">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.to}
                 href={link.to}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-bg hover:text-text-primary"
+                className="rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-surface-raised hover:text-text-primary"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          {/* Desktop CTA */}
-          <div className="hidden items-center gap-2 lg:flex">
+          {/* Desktop CTA (Right aligned) */}
+          <div className="hidden flex-1 items-center justify-end gap-3 lg:flex">
             <button
               onClick={toggle}
               aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -101,43 +116,67 @@ export function PublicNavbar() {
             </button>
           </div>
         </div>
-
-        {/* Mobile menu */}
-        {isOpen && (
-          <div className="border-t border-border bg-surface px-6 py-4 lg:hidden">
-            <nav className="flex flex-col gap-1">
-              {NAV_LINKS.map((link) => (
-                <a
-                  key={link.to}
-                  href={link.to}
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-text-muted hover:bg-bg hover:text-text-primary"
-                >
-                  {link.label}
-                </a>
-              ))}
-              <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
-                {session ? (
-                  <Link to="/dashboard">
-                    <Button className="w-full" size="sm">Go to Dashboard</Button>
-                  </Link>
-                ) : (
-                  <>
-                    <Link to="/login">
-                      <Button variant="secondary" className="w-full" size="sm">Log in</Button>
-                    </Link>
-                    <Link to="/signup">
-                      <Button className="w-full" size="sm">Get started</Button>
-                    </Link>
-                  </>
-                )}
-              </div>
-            </nav>
-          </div>
-        )}
       </header>
+
+      {/* Mobile Menu Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-[60] bg-ink/60 backdrop-blur-sm transition-opacity lg:hidden"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Mobile Drawer */}
+      <div 
+        className={cn(
+          "fixed inset-y-0 right-0 z-[70] w-full max-w-sm bg-surface shadow-2xl transition-transform duration-300 ease-out lg:hidden flex flex-col",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <div className="flex h-16 items-center justify-between border-b border-border px-6">
+          <Logo />
+          <button
+            onClick={() => setIsOpen(false)}
+            aria-label="Close menu"
+            className="rounded-lg p-2 text-text-muted hover:bg-bg hover:text-text-primary"
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+        <nav className="flex flex-col gap-2 p-6 overflow-y-auto">
+          {NAV_LINKS.map((link) => (
+            <a
+              key={link.to}
+              href={link.to}
+              onClick={() => setIsOpen(false)}
+              className="rounded-xl px-4 py-3 text-base font-medium text-text-muted hover:bg-bg hover:text-text-primary transition-colors"
+            >
+              {link.label}
+            </a>
+          ))}
+          
+          <div className="mt-6 flex flex-col gap-3 pt-6 border-t border-border">
+            {session ? (
+              <Link to="/dashboard" onClick={() => setIsOpen(false)}>
+                <Button className="w-full" size="lg">Go to Dashboard</Button>
+              </Link>
+            ) : (
+              <>
+                <Link to="/login" onClick={() => setIsOpen(false)}>
+                  <Button variant="secondary" className="w-full" size="lg">Log in</Button>
+                </Link>
+                <Link to="/signup" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full" size="lg">Get started</Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </nav>
+      </div>
+
       {/* Spacer so content isn't hidden behind fixed navbar */}
-      <div className="h-16" />
+      <div className="h-16 lg:h-[72px]" />
     </>
   );
 }
