@@ -43,16 +43,21 @@ export async function isAdminEmail(email: string): Promise<boolean> {
 
 /** Fetch all admin records from Firestore. */
 export async function getAllAdmins(): Promise<AdminRecord[]> {
-  const snap = await getDocs(collection(db, "admins"));
-  const results: AdminRecord[] = snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      email: d.id,
-      grantedBy: data.grantedBy ?? "system",
-      grantedAt: data.grantedAt?.toDate?.() ?? null,
-      isSuperAdmin: d.id.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase(),
-    };
-  });
+  let results: AdminRecord[] = [];
+  try {
+    const snap = await getDocs(collection(db, "admins"));
+    results = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        email: d.id,
+        grantedBy: data.grantedBy ?? "system",
+        grantedAt: data.grantedAt?.toDate?.() ?? null,
+        isSuperAdmin: d.id.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase(),
+      };
+    });
+  } catch {
+    // Fallback if Firestore is unconfigured or offline
+  }
 
   // Ensure super-admin is always in the list even if not in Firestore
   const hasSuperAdmin = results.some(
