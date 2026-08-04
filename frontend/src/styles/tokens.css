@@ -1,88 +1,95 @@
 /*
-  CleanVision design tokens
-  ─────────────────────────
-  Color story: hospitals already use blue-violet germicidal (UV-C) light as the
-  visual signal for "this surface is being checked / sanitized." CleanVision's
-  accent color borrows that same blue-violet glow for anything related to an
-  active scan, so the product's core action visually rhymes with the real-world
-  behavior it's modeling. The primary brand blue stays a calmer, more clinical
-  blue reserved for navigation and structure, so the violet accent doesn't get
-  diluted by overuse.
+  CleanVision design tokens — "Clinical Precision" design system
+  ────────────────────────────────────────────────────────────────
+  Light mode: "Laboratory White"
+    Clean, precise, clinical. Off-white base (not blinding pure white),
+    sky-blue primary evoking trust and medicine, deep violet accent for
+    AI/scan actions only. Highly readable, zero visual noise.
 
-  Status colors (success/warning/danger = clean/needs_attention/dirty) are kept
-  fully independent from both the primary and accent hues so a room's status is
-  never ambiguous next to UI chrome.
+  Dark mode: "Monitor Glow"
+    Deep space-navy backgrounds evoking medical monitor displays.
+    Electric accents that pop against the dark — not just inverted light mode.
+    Each value is independently tuned, not auto-generated.
 
-  All values are R G B triplets (no `rgb()` wrapper) so Tailwind can apply
+  All values: R G B triplets (no rgb() wrapper) so Tailwind can compose
   alpha via `rgb(var(--x) / <alpha-value>)`.
 */
 
 :root {
-  /* Base neutrals */
-  --color-ink: 11 18 32;               /* #0B1220 */
-  --color-bg: 247 248 251;             /* #F7F8FB */
-  --color-surface: 255 255 255;        /* #FFFFFF */
-  --color-surface-raised: 255 255 255; /* #FFFFFF, distinguished via shadow not fill in light mode */
-  --color-border: 226 230 238;         /* #E2E6EE */
+  /* ── Neutrals ─────────────────────────────────────────────────── */
+  --color-ink: 10 15 30;               /* #0A0F1E — near-black, blue-tinted */
+  --color-bg: 244 246 251;             /* #F4F6FB — cool off-white, not harsh */
+  --color-surface: 255 255 255;        /* #FFFFFF — card / panel surface */
+  --color-surface-raised: 255 255 255; /* Same; elevated via shadow in light */
+  --color-border: 219 225 238;         /* #DBE1EE — blue-tinted dividers */
 
-  --color-text-primary: 15 23 42;      /* #0F172A */
-  --color-text-muted: 100 112 134;     /* #647086 */
-  --color-text-disabled: 170 178 194;  /* #AAB2C2 */
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --color-text-primary: 10 15 30;      /* #0A0F1E — same as ink */
+  --color-text-muted: 84 97 120;       /* #546178 — readable mid-gray */
+  --color-text-disabled: 164 174 194;  /* #A4AEC2 — placeholder / disabled */
 
-  /* Brand: clinical blue */
-  --color-primary: 30 78 216;          /* #1E4ED8 */
-  --color-primary-hover: 24 64 181;    /* #1840B5 */
-  --color-primary-active: 19 51 145;   /* #133391 */
+  /* ── Brand: Sky Blue — trust, clarity, medicine ──────────────── */
+  --color-primary: 13 110 253;         /* #0D6EFD — vivid sky blue */
+  --color-primary-hover: 11 94 215;    /* #0B5ED7 */
+  --color-primary-active: 9 78 177;    /* #094EB1 */
 
-  /* Signature accent: germicidal UV blue-violet, reserved for scan/active states */
-  --color-accent: 109 74 242;          /* #6D4AF2 */
-  --color-accent-hover: 92 55 227;     /* #5C37E3 */
+  /* ── Accent: Deep Violet — AI, scan, special actions only ─────── */
+  --color-accent: 109 40 217;          /* #6D28D9 — rich purple */
+  --color-accent-hover: 91 33 182;     /* #5B21B6 */
 
-  /* Status: clean / needs_attention / dirty */
-  --color-success: 21 128 61;          /* #15803D */
-  --color-success-bg: 220 245 227;     /* #DCF5E3 */
-  --color-warning: 161 87 0;           /* #A15700 */
-  --color-warning-bg: 254 236 199;     /* #FEECC7 */
-  --color-danger: 190 33 49;           /* #BE2131 */
-  --color-danger-bg: 252 222 226;      /* #FCDEE2 */
+  /* ── Status: clean / needs_attention / dirty ─────────────────── */
+  --color-success: 5 150 105;          /* #059669 — emerald */
+  --color-success-bg: 209 250 229;     /* #D1FAE5 */
+  --color-warning: 180 83 9;           /* #B45309 — deep amber */
+  --color-warning-bg: 254 243 199;     /* #FEF3C7 */
+  --color-danger: 185 28 28;           /* #B91C1C — true red */
+  --color-danger-bg: 254 226 226;      /* #FEE2E2 */
 
-  --color-focus: 109 74 242;           /* same family as accent for visible focus rings */
+  /* ── Highlight: for hover backgrounds, selection ──────────────── */
+  --color-highlight: 239 246 255;      /* #EFF6FF — very subtle blue tint */
+
+  /* ── Focus ring ───────────────────────────────────────────────── */
+  --color-focus: 13 110 253;           /* matches primary */
 }
 
 /*
-  Dark theme — not an inversion. Each value is independently chosen for
-  contrast, readability, and vibrancy in a dark context.
-  Primary chrome goes dark-blue/navy; surfaces use layered dark slates;
-  status colors are lightened/saturated so they remain readable against dark bg.
+  Dark mode — "Monitor Glow"
+  Deep navy/indigo blacks, electric accents, WCAG AA contrast throughout.
+  NOT an inversion — every value is hand-tuned for dark surfaces.
 */
 .dark {
-  /* Base neutrals */
-  --color-ink: 248 250 255;            /* almost-white for ink-on-dark */
-  --color-bg: 10 13 22;               /* #0A0D16 — deep navy-black */
-  --color-surface: 17 22 38;          /* #111626 — card surface */
-  --color-surface-raised: 24 30 52;   /* #181E34 — elevated card */
-  --color-border: 38 47 76;           /* #262F4C — subtle dividers */
+  /* ── Neutrals ─────────────────────────────────────────────────── */
+  --color-ink: 232 238 255;            /* #E8EEFF — blue-tinted near-white */
+  --color-bg: 6 9 18;                  /* #060912 — deep space black */
+  --color-surface: 13 19 36;           /* #0D1324 — elevated card */
+  --color-surface-raised: 20 28 52;    /* #141C34 — higher elevation */
+  --color-border: 30 40 70;            /* #1E2846 — subtle navy dividers */
 
-  --color-text-primary: 235 240 255;  /* #EBF0FF — near white with blue tint */
-  --color-text-muted: 130 145 185;    /* #8291B9 — readable muted */
-  --color-text-disabled: 65 78 115;   /* #414E73 */
+  /* ── Text ─────────────────────────────────────────────────────── */
+  --color-text-primary: 228 235 255;   /* #E4EBFF — crisp blue-white */
+  --color-text-muted: 115 130 170;     /* #7382AA */
+  --color-text-disabled: 55 68 108;    /* #37446C */
 
-  /* Brand: primary blue brightened for dark bg */
-  --color-primary: 99 130 255;        /* #6382FF */
-  --color-primary-hover: 120 148 255; /* #7894FF */
-  --color-primary-active: 79 110 245; /* #4F6EF5 */
+  /* ── Brand: brightened for dark background ───────────────────── */
+  --color-primary: 59 130 246;         /* #3B82F6 — blue-400 */
+  --color-primary-hover: 96 165 250;   /* #60A5FA — blue-400 lighter */
+  --color-primary-active: 37 99 235;   /* #2563EB */
 
-  /* Accent: same UV-violet, slightly brighter in dark */
-  --color-accent: 139 101 255;        /* #8B65FF */
-  --color-accent-hover: 159 121 255;  /* #9F79FF */
+  /* ── Accent: lighter violet for dark bg ──────────────────────── */
+  --color-accent: 167 139 250;         /* #A78BFA — violet-400 */
+  --color-accent-hover: 196 181 253;   /* #C4B5FD — violet-300 */
 
-  /* Status: lightened for dark backgrounds, WCAG AA contrast maintained */
-  --color-success: 52 199 109;        /* #34C76D */
-  --color-success-bg: 10 46 26;       /* #0A2E1A */
-  --color-warning: 251 161 38;        /* #FBA126 */
-  --color-warning-bg: 46 28 0;        /* #2E1C00 */
-  --color-danger: 255 99 112;         /* #FF6370 */
-  --color-danger-bg: 60 10 16;        /* #3C0A10 */
+  /* ── Status: vivid for readability against dark backgrounds ───── */
+  --color-success: 16 185 129;         /* #10B981 — teal-green */
+  --color-success-bg: 6 46 26;         /* #062E1A */
+  --color-warning: 251 191 36;         /* #FBBF24 — amber-400 */
+  --color-warning-bg: 50 30 0;         /* #321E00 */
+  --color-danger: 248 113 113;         /* #F87171 — red-400 */
+  --color-danger-bg: 50 10 10;         /* #320A0A */
 
-  --color-focus: 139 101 255;         /* matches dark accent */
+  /* ── Highlight ────────────────────────────────────────────────── */
+  --color-highlight: 13 19 36;         /* same as surface in dark */
+
+  /* ── Focus ring ───────────────────────────────────────────────── */
+  --color-focus: 59 130 246;
 }

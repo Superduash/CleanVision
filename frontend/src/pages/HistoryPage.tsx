@@ -1,298 +1,283 @@
-import { useMemo, useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { formatDistanceToNow, format } from "date-fns";
 import {
-  format,
-  formatDistanceToNow,
-  startOfDay,
-  isAfter,
-  subDays,
-} from "date-fns";
-import { Filter, ChevronDown, ExternalLink } from "lucide-react";
-import { api, type RoomStatus } from "@/lib/api";
+  History,
+  Download,
+  Filter,
+  Trash2,
+  Image as ImageIcon,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
+import { api, imageUrl, type ScanRecord } from "@/lib/api";
 import { useRooms } from "@/hooks/useRooms";
+import { useAuth } from "@/hooks/useAuth";
 import { StatusBadge } from "@/components/StatusBadge";
+import { Button } from "@/components/Button";
+import { cn } from "@/lib/utils";
 
-const DATE_RANGES = [
-  { label: "Last 7 days", days: 7 },
-  { label: "Last 14 days", days: 14 },
-  { label: "Last 30 days", days: 30 },
-  { label: "All time", days: 0 },
-];
-
-const STATUS_OPTIONS: { value: RoomStatus | "all"; label: string }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "clean", label: "Clean" },
-  { value: "needs_attention", label: "Needs attention" },
-  { value: "dirty", label: "Dirty" },
-];
-
-interface FlatScan {
-  id: number;
-  room_id: number;
-  roomName: string;
-  roomBlock: string;
-  cleanliness_score: number;
-  status: RoomStatus;
-  timestamp: string;
-}
-
-/** Fetches history for ALL rooms and merges them into a single flat list. */
-function useAllHistory(
-  rooms: ReturnType<typeof useRooms>["data"],
-  selectedRoomId: number,
-) {
-  // Always fetch all rooms' history; we filter client-side
-  const allRoomIds = useMemo(
-    () => rooms?.map((r) => r.id) ?? [],
-    [rooms],
-  );
-
-  const query = useQuery({
-    queryKey: ["history-all", allRoomIds],
-    queryFn: async () => {
-      if (allRoomIds.length === 0) return [];
-      const results = await Promise.all(
-        allRoomIds.map((id) => api.getHistory(id, 100)),
-      );
-      return allRoomIds.flatMap((rid, i) =>
-        results[i].history.map((scan) => ({ ...scan, roomId: rid })),
-      );
-    },
-    enabled: allRoomIds.length > 0,
-    refetchOnWindowFocus: true,
-    staleTime: 30_000,
-  });
-
-  const flat: FlatScan[] = useMemo(() => {
-    if (!query.data || !rooms) return [];
-    return query.data
-      .map((scan) => {
-        const room = rooms.find((r) => r.id === scan.room_id);
-        return {
-          id: scan.id,
-          room_id: scan.room_id,
-          roomName: room?.name ?? `Room ${scan.room_id}`,
-          roomBlock: room?.block ?? "—",
-          cleanliness_score: scan.cleanliness_score,
-          status: scan.status,
-          timestamp: scan.timestamp,
-        };
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      );
-  }, [query.data, rooms]);
-
-  const filtered = useMemo(() => {
-    if (selectedRoomId) {
-      return flat.filter((s) => s.room_id === selectedRoomId);
-    }
-    return flat;
-  }, [flat, selectedRoomId]);
-
-  return { ...query, flat: filtered };
+// ── Export CSV Helper ────────────────────────────────────────────────────────
+function exportToCSV(data: ScanRecord[], roomName: string) {
+  const headers = ["Scan ID", "Room ID", "Score", "Status", "Timestamp"];
+  const rows = data.map((s) => [
+    s.id,
+    s.room_id,
+    s.cleanliness_score,
+    s.status,
+    `"${s.timestamp}"`,
+  ]);
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `cleanvision_scans_${roomName.replace(/\s+/g, "_")}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 export function HistoryPage() {
   const [searchParams] = useSearchParams();
-  const preselectedRoom = searchParams.get("room")
-    ? Number(searchParams.get("room"))
-    : 0;
+  const initialRoomId = searchParams.get("room") ? Number(searchParams.get("room")) : 0;
+  const [selectedRoomId, setSelectedRoomId] = useState<number>(initialRoomId);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deletingScanId, setDeletingScanId] = useState<number | null>(null);
 
-  const { data: rooms } = useRooms();
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(preselectedRoom);
-  const [statusFilter, setStatusFilter] = useState<RoomStatus | "all">("all");
-  const [dateRange, setDateRange] = useState<number>(7);
+  const { session } = useAuth();
+  const isAdmin = session?.role === "admin";
+  const queryClient = useQueryClient();
 
-  const { flat, isLoading, isError } = useAllHistory(rooms, selectedRoomId);
+  const { data: rooms = [] } = useRooms();
 
-  const filteredScans = useMemo(() => {
-    return flat.filter((scan) => {
-      const matchesStatus =
-        statusFilter === "all" || scan.status === statusFilter;
-      const cutoff =
-        dateRange > 0
-          ? startOfDay(subDays(new Date(), dateRange - 1))
-          : new Date(0);
-      const matchesDate = isAfter(new Date(scan.timestamp), cutoff);
-      return matchesStatus && matchesDate;
-    });
-  }, [flat, statusFilter, dateRange]);
+  // Fetch history for selected room or all room history
+  const { data: history = [], isLoading } = useQuery({
+    queryKey: ["history", selectedRoomId],
+    queryFn: () => api.getHistory(selectedRoomId),
+    enabled: true,
+    select: (d) => d.history,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.deleteScan(id),
+    onSuccess: () => {
+      toast.success("Scan record deleted.");
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+      setDeletingScanId(null);
+    },
+    onError: () => toast.error("Failed to delete scan record."),
+  });
+
+  const filteredHistory = history.filter((s) => {
+    if (statusFilter !== "all" && s.status !== statusFilter) return false;
+    return true;
+  });
+
+  const selectedRoom = rooms.find((r) => r.id === selectedRoomId);
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 page-enter">
-      <div>
-        <h1 className="text-2xl font-semibold text-text-primary">
-          Scan history
-        </h1>
-        <p className="mt-1 text-sm text-text-muted">
-          All scans across the facility, filterable by room, status, and date.
-        </p>
+    <div className="mx-auto max-w-5xl px-6 py-8 page-enter space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+            <History className="h-6 w-6 text-primary" /> Scan History
+          </h1>
+          <p className="mt-1 text-sm text-text-muted">
+            Complete audit trail of cleanliness scans across rooms.
+          </p>
+        </div>
+
+        {filteredHistory.length > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => exportToCSV(filteredHistory, selectedRoom?.name ?? "all")}
+            className="gap-1.5"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Filter className="h-4 w-4 shrink-0 text-text-muted" />
-
-        <div className="relative">
+      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-surface p-4 shadow-card">
+        {/* Room selector */}
+        <div className="flex items-center gap-2 min-w-[200px]">
+          <Filter className="h-4 w-4 text-text-disabled" />
           <select
-            id="history-room-filter"
             value={selectedRoomId}
             onChange={(e) => setSelectedRoomId(Number(e.target.value))}
-            className="h-9 appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 text-sm text-text-primary outline-none focus:border-primary"
+            className="h-9 w-full rounded-lg border border-border bg-bg px-3 text-sm font-medium text-text-primary outline-none focus:border-primary"
           >
-            <option value={0}>All rooms</option>
-            {rooms?.map((room) => (
-              <option key={room.id} value={room.id}>
-                {room.name}
+            <option value={0}>Select a room...</option>
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name} ({r.block})
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
         </div>
 
-        <div className="relative">
-          <select
-            id="history-status-filter"
-            value={statusFilter}
-            onChange={(e) =>
-              setStatusFilter(e.target.value as RoomStatus | "all")
-            }
-            className="h-9 appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 text-sm text-text-primary outline-none focus:border-primary"
-          >
-            {STATUS_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+        {/* Status filter */}
+        <div className="flex items-center gap-1">
+          {["all", "clean", "needs_attention", "dirty"].map((st) => (
+            <button
+              key={st}
+              onClick={() => setStatusFilter(st)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-all",
+                statusFilter === st
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-text-muted hover:text-text-primary"
+              )}
+            >
+              {st.replace("_", " ")}
+            </button>
+          ))}
         </div>
-
-        <div className="relative">
-          <select
-            id="history-date-filter"
-            value={dateRange}
-            onChange={(e) => setDateRange(Number(e.target.value))}
-            className="h-9 appearance-none rounded-lg border border-border bg-surface pl-3 pr-8 text-sm text-text-primary outline-none focus:border-primary"
-          >
-            {DATE_RANGES.map((r) => (
-              <option key={r.days} value={r.days}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-        </div>
-
-        <span className="ml-auto text-sm text-text-muted">
-          {isLoading
-            ? "Loading…"
-            : `${filteredScans.length} ${filteredScans.length === 1 ? "scan" : "scans"}`}
-        </span>
       </div>
 
       {/* Table */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
-        {isLoading && (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-14 skeleton rounded-lg" />
-            ))}
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+        {selectedRoomId === 0 ? (
+          <div className="p-12 text-center text-sm text-text-muted">
+            Select a room above to view its full scan history audit trail.
           </div>
-        )}
-
-        {isError && (
-          <div className="px-6 py-12 text-center">
-            <p className="font-medium text-text-primary">
-              Couldn&apos;t load history
-            </p>
-            <p className="mt-1 text-sm text-text-muted">
-              Check that the backend is running and refresh.
-            </p>
-          </div>
-        )}
-
-        {!isLoading && !isError && filteredScans.length === 0 && (
-          <div className="px-6 py-16 text-center">
-            <p className="font-medium text-text-primary">No scans found</p>
-            <p className="mt-1 text-sm text-text-muted">
-              Try widening the date range or changing the filters.
-            </p>
-          </div>
-        )}
-
-        {!isLoading && filteredScans.length > 0 && (
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-bg">
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    Score
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    Status
-                  </th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted sm:table-cell">
-                    Room
-                  </th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted md:table-cell">
-                    Block
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                    When
-                  </th>
-                  <th className="w-10 px-4 py-3" />
+                <tr className="border-b border-border bg-bg text-left">
+                  <th className="px-5 py-3 font-semibold text-text-muted">Image</th>
+                  <th className="px-5 py-3 font-semibold text-text-muted">Score</th>
+                  <th className="px-5 py-3 font-semibold text-text-muted">Status</th>
+                  <th className="px-5 py-3 font-semibold text-text-muted">Timestamp</th>
+                  {isAdmin && <th className="px-5 py-3 font-semibold text-text-muted text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredScans.map((scan) => (
-                  <tr
-                    key={`${scan.room_id}-${scan.id}`}
-                    className="transition-colors hover:bg-bg"
-                  >
-                    <td className="px-6 py-3 font-mono font-semibold text-text-primary">
-                      {Math.round(scan.cleanliness_score)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={scan.status} />
-                    </td>
-                    <td className="hidden px-4 py-3 text-text-primary sm:table-cell">
-                      {scan.roomName}
-                    </td>
-                    <td className="hidden px-4 py-3 text-text-muted md:table-cell">
-                      {scan.roomBlock}
-                    </td>
-                    <td className="px-6 py-3 text-text-muted">
-                      <span
-                        title={format(
-                          new Date(scan.timestamp),
-                          "dd MMM yyyy, HH:mm",
-                        )}
-                      >
-                        {formatDistanceToNow(new Date(scan.timestamp), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        to={`/dashboard/rooms/${scan.room_id}`}
-                        aria-label={`View ${scan.roomName}`}
-                        className="rounded p-1 text-text-disabled hover:text-primary"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </Link>
+                {isLoading &&
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      {Array.from({ length: isAdmin ? 5 : 4 }).map((_, j) => (
+                        <td key={j} className="px-5 py-3">
+                          <div className="h-6 skeleton rounded" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+
+                {!isLoading && filteredHistory.length === 0 && (
+                  <tr>
+                    <td colSpan={isAdmin ? 5 : 4} className="py-12 text-center text-text-muted">
+                      No scan records match the current criteria.
                     </td>
                   </tr>
-                ))}
+                )}
+
+                {filteredHistory.map((scan) => {
+                  const src = imageUrl(scan.image_path);
+                  const score = Math.round(scan.cleanliness_score);
+                  const scoreColor =
+                    scan.status === "clean"
+                      ? "text-success"
+                      : scan.status === "needs_attention"
+                      ? "text-warning"
+                      : "text-danger";
+
+                  return (
+                    <tr key={scan.id} className="hover:bg-highlight transition-colors">
+                      <td className="px-5 py-3">
+                        {src ? (
+                          <button
+                            onClick={() => setPreviewImage(src)}
+                            className="group relative h-10 w-14 overflow-hidden rounded-lg border border-border bg-bg"
+                          >
+                            <img src={src} alt="Scan preview" className="h-full w-full object-cover transition-transform group-hover:scale-110" />
+                          </button>
+                        ) : (
+                          <div className="flex h-10 w-14 items-center justify-center rounded-lg border border-border bg-bg text-text-disabled">
+                            <ImageIcon className="h-4 w-4" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-5 py-3 font-mono font-bold text-base">
+                        <span className={scoreColor}>{score}/100</span>
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge status={scan.status} />
+                      </td>
+                      <td className="px-5 py-3 text-text-muted text-xs">
+                        <div>{format(new Date(scan.timestamp), "dd MMM yyyy, HH:mm")}</div>
+                        <div className="text-[11px] text-text-disabled">
+                          {formatDistanceToNow(new Date(scan.timestamp), { addSuffix: true })}
+                        </div>
+                      </td>
+                      {isAdmin && (
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            onClick={() => setDeletingScanId(scan.id)}
+                            className="rounded-lg p-1.5 text-text-disabled hover:bg-danger-bg hover:text-danger transition-colors"
+                            title="Delete scan record"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink/60 backdrop-blur-sm" onClick={() => setPreviewImage(null)} />
+          <div className="relative max-w-2xl overflow-hidden rounded-2xl border border-border bg-surface p-2 shadow-raised animate-scale-in">
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute right-4 top-4 z-10 rounded-full bg-ink/50 p-1.5 text-white hover:bg-ink/80 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <img src={previewImage} alt="Full scan image" className="max-h-[80vh] w-full rounded-xl object-contain" />
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deletingScanId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={() => setDeletingScanId(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-raised animate-scale-in">
+            <h3 className="text-lg font-bold text-text-primary">Delete Scan Record?</h3>
+            <p className="mt-1.5 text-sm text-text-muted">
+              This will permanently delete this scan record and its associated image.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => setDeletingScanId(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-danger hover:bg-danger/90 shadow-none"
+                onClick={() => deleteMutation.mutate(deletingScanId)}
+                isLoading={deleteMutation.isPending}
+              >
+                Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

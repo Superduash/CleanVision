@@ -15,11 +15,10 @@ function getInitialTheme(): Theme {
   try {
     const saved = localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (saved === "dark" || saved === "light") return saved;
-    // Respect OS preference if no saved choice
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) return "dark";
   } catch {
     // localStorage might be unavailable in private browsing
   }
+  // Default to light — by design, not by OS preference
   return "light";
 }
 

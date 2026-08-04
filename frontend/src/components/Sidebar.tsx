@@ -1,170 +1,156 @@
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { NavLink, Link } from "react-router-dom";
 import {
   LayoutGrid,
   ScanLine,
   History,
-  Settings,
   BarChart2,
+  Settings,
   Bell,
-  User,
   LogOut,
-  Home,
-  Moon,
-  Sun,
-  Shield,
+  ShieldCheck,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
-import { Logo } from "./Logo";
-import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useTheme } from "@/hooks/useTheme";
-import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface NavItem {
   to: string;
   label: string;
   icon: React.ElementType;
+  badge?: number;
   adminOnly?: boolean;
 }
 
-const ALL_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
-  { to: "/dashboard/scan", label: "New scan", icon: ScanLine },
-  { to: "/dashboard/history", label: "Scan history", icon: History },
-  { to: "/dashboard/reports", label: "Reports", icon: BarChart2, adminOnly: true },
-  { to: "/dashboard/notifications", label: "Alerts", icon: Bell },
-  { to: "/dashboard/admin", label: "Admin panel", icon: Shield, adminOnly: true },
-  { to: "/dashboard/settings", label: "Settings", icon: Settings },
-  { to: "/dashboard/profile", label: "My profile", icon: User },
-];
-
-const PATIENT_NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Room status", icon: ClipboardList },
-  { to: "/dashboard/notifications", label: "Alerts", icon: Bell },
-  { to: "/dashboard/settings", label: "Settings", icon: Settings },
-  { to: "/dashboard/profile", label: "My profile", icon: User },
-];
-
 export function Sidebar() {
   const { session, signOut } = useAuth();
-  const { theme, toggle } = useTheme();
-  const navigate = useNavigate();
-
   const isAdmin = session?.role === "admin";
-  const navItems = isAdmin ? ALL_NAV_ITEMS : PATIENT_NAV_ITEMS;
 
-  const handleSignOut = () => {
-    signOut();
-    toast.success("Signed out successfully");
-    navigate("/", { replace: true });
-  };
+  const { data: notifData } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => api.getNotifications(50),
+    refetchInterval: 15_000,
+  });
 
-  const roleBadgeClass =
-    session?.role === "admin"
-      ? "bg-accent/15 text-accent"
-      : session?.role === "patient"
-      ? "bg-success/15 text-success"
-      : "bg-border text-text-muted";
+  const { data: requestData } = useQuery({
+    queryKey: ["cleaning-requests"],
+    queryFn: () => api.getCleaningRequests("pending"),
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
 
-  const roleLabel =
-    session?.role === "admin"
-      ? "Admin"
-      : session?.role === "patient"
-      ? "Patient"
-      : "User";
+  const unreadNotifs = notifData?.unread_count ?? 0;
+  const pendingRequests = requestData?.pending_count ?? 0;
+
+  const adminNavItems: NavItem[] = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutGrid },
+    { to: "/dashboard/scan", label: "Scan Room", icon: ScanLine },
+    { to: "/dashboard/history", label: "Scan History", icon: History },
+    { to: "/dashboard/reports", label: "Reports & Stats", icon: BarChart2 },
+    { to: "/dashboard/cleaning-requests", label: "Cleaning Requests", icon: ClipboardList, badge: pendingRequests },
+    { to: "/dashboard/notifications", label: "Alerts", icon: Bell, badge: unreadNotifs },
+    { to: "/dashboard/admin", label: "Admin Panel", icon: ShieldCheck, adminOnly: true },
+  ];
+
+  const patientNavItems: NavItem[] = [
+    { to: "/dashboard", label: "Rooms Overview", icon: LayoutGrid },
+    { to: "/dashboard/notifications", label: "Alerts", icon: Bell, badge: unreadNotifs },
+  ];
+
+  const items = isAdmin ? adminNavItems : patientNavItems;
 
   return (
-    <aside className="hidden h-screen w-[220px] shrink-0 flex-col border-r border-border bg-surface lg:flex">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-4">
-        <Logo />
-        <button
-          onClick={toggle}
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          className="rounded-lg p-1.5 text-text-muted transition-colors hover:bg-bg hover:text-text-primary"
-          title={theme === "dark" ? "Light mode" : "Dark mode"}
-        >
-          {theme === "dark" ? (
-            <Sun className="h-4 w-4" />
-          ) : (
-            <Moon className="h-4 w-4" />
-          )}
-        </button>
-      </div>
+    <aside className="hidden lg:flex w-64 flex-col justify-between border-r border-border bg-surface px-4 py-6 shadow-card">
+      <div className="space-y-6">
+        {/* Logo */}
+        <Link to="/dashboard" className="flex items-center gap-2.5 px-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-primary-glow">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="text-lg font-bold text-text-primary">CleanVision</span>
+            <p className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Hospital Hygiene</p>
+          </div>
+        </Link>
 
-      {/* Navigation */}
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4" aria-label="Primary">
-        {/* Role section label */}
-        <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-text-disabled">
-          {isAdmin ? "Management" : "Patient View"}
-        </p>
+        {/* Navigation Section */}
+        <nav className="space-y-1" aria-label="Main navigation">
+          <p className="px-3 text-[11px] font-semibold text-text-disabled uppercase tracking-wider">
+            {isAdmin ? "Management Tools" : "Patient Portal"}
+          </p>
+          {items.map(({ to, label, icon: Icon, badge }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === "/dashboard"}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition-all",
+                  isActive
+                    ? "bg-primary text-white shadow-primary-glow"
+                    : "text-text-muted hover:bg-highlight hover:text-text-primary"
+                )
+              }
+            >
+              <div className="flex items-center gap-3">
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+              </div>
+              {badge != null && badge > 0 && (
+                <span className="rounded-full bg-warning px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                  {badge}
+                </span>
+              )}
+            </NavLink>
+          ))}
+        </nav>
 
-        {navItems.map(({ to, label, icon: Icon }) => (
+        {/* Settings link */}
+        <div className="pt-4 border-t border-border">
+          <p className="px-3 text-[11px] font-semibold text-text-disabled uppercase tracking-wider mb-1">
+            System
+          </p>
           <NavLink
-            key={to}
-            to={to}
-            end={to === "/dashboard"}
+            to="/dashboard/settings"
             className={({ isActive }) =>
               cn(
-                "flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all",
                 isActive
-                  ? "bg-primary/10 text-primary shadow-[inset_2px_0_0_rgb(var(--color-primary))]"
-                  : "text-text-muted hover:bg-bg hover:text-text-primary",
+                  ? "bg-primary text-white shadow-primary-glow"
+                  : "text-text-muted hover:bg-highlight hover:text-text-primary"
               )
             }
           >
-            <Icon className="h-4 w-4 shrink-0" strokeWidth={2.25} />
-            <span className="truncate">{label}</span>
+            <Settings className="h-4 w-4" />
+            <span>Settings</span>
           </NavLink>
-        ))}
-
-        {/* Home link */}
-        <div className="mt-auto pt-4 border-t border-border">
-          <Link
-            to="/"
-            className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium text-text-muted transition-all hover:bg-bg hover:text-text-primary"
-          >
-            <Home className="h-4 w-4 shrink-0" strokeWidth={2.25} />
-            <span>Back to home</span>
-          </Link>
         </div>
-      </nav>
+      </div>
 
-      {/* User footer */}
-      <div className="border-t border-border p-3">
-        <div className="flex items-center gap-2 rounded-xl bg-bg px-3 py-2.5">
-          {/* Avatar */}
-          <div
-            className={cn(
-              "grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-bold",
-              session?.role === "admin" ? "bg-accent/20 text-accent" : "bg-primary/10 text-primary",
+      {/* User Footer Card */}
+      <div className="border-t border-border pt-4">
+        <div className="flex items-center justify-between rounded-xl bg-bg p-3 border border-border">
+          <Link to="/dashboard/profile" className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity">
+            {session?.photoURL ? (
+              <img src={session.photoURL} alt={session.name} className="h-9 w-9 rounded-full object-cover border border-primary" />
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {(session?.name?.[0] ?? "U").toUpperCase()}
+              </div>
             )}
-          >
-            {(session?.name ?? "G")
-              .split(" ")
-              .map((w) => w[0])
-              .join("")
-              .toUpperCase()
-              .slice(0, 2)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <p className="truncate text-xs font-semibold text-text-primary leading-none">
-                {session?.name ?? "Guest"}
-              </p>
-              <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase", roleBadgeClass)}>
-                {roleLabel}
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-text-primary">{session?.name}</p>
+              <p className="truncate text-[11px] text-text-muted capitalize">{session?.role}</p>
             </div>
-            <p className="mt-0.5 truncate text-[11px] text-text-muted">{session?.email}</p>
-          </div>
+          </Link>
           <button
-            onClick={handleSignOut}
-            aria-label="Sign out"
-            className="shrink-0 rounded-md p-1.5 text-text-muted transition-colors hover:bg-surface hover:text-danger"
-            title="Sign out"
+            onClick={signOut}
+            title="Sign Out"
+            className="rounded-lg p-1.5 text-text-disabled hover:bg-danger-bg hover:text-danger transition-colors"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <LogOut className="h-4 w-4" />
           </button>
         </div>
       </div>

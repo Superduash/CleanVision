@@ -50,6 +50,31 @@ def init_db():
                 FOREIGN KEY(room_id) REFERENCES rooms(id)
             )
         ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cleaning_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_id INTEGER NOT NULL,
+                requested_by_name TEXT,
+                requested_by_email TEXT,
+                reason TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP,
+                FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT,
+                room_id INTEGER,
+                is_read INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE SET NULL
+            )
+        ''')
 
 
 def add_room(name, block):
@@ -147,6 +172,224 @@ def get_scan_history(room_id, limit=10):
         )
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+def get_scan(scan_id):
+    """Returns a single scan by id, or None if not found."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM scans WHERE id = ?', (scan_id,))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+
+def delete_scan(scan_id):
+    """Deletes a single scan record. Returns True if deleted, False if not found."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM scans WHERE id = ?', (scan_id,))
+        return cursor.rowcount > 0
+
+
+def delete_room(room_id):
+    """
+    Deletes a room and all its associated scans (manual cascade).
+    Returns the list of image paths that should be cleaned up from disk.
+    Returns None if the room was not found.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Check room exists
+        cursor.execute('SELECT id FROM rooms WHERE id = ?', (room_id,))
+        if not cursor.fetchone():
+            return None
+
+        # Collect all image paths for file cleanup
+        image_paths = []
+
+        # Room baseline image
+        cursor.execute('SELECT baseline_image_path FROM rooms WHERE id = ?', (room_id,))
+        row = cursor.fetchone()
+        if row and row['baseline_image_path']:
+            image_paths.append(row['baseline_image_path'])
+
+        # Scan images
+        cursor.execute('SELECT image_path FROM scans WHERE room_id = ?', (room_id,))
+        for scan_row in cursor.fetchall():
+            if scan_row['image_path']:
+                image_paths.append(scan_row['image_path'])
+
+        # Delete scans first (foreign key)
+        cursor.execute('DELETE FROM scans WHERE room_id = ?', (room_id,))
+
+        # Delete the room
+        cursor.execute('DELETE FROM rooms WHERE id = ?', (room_id,))
+
+        return image_paths
+
+
+def update_room(room_id, name, block):
+    """Updates a room's name and block. Returns True if updated, False if not found."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE rooms SET name = ?, block = ? WHERE id = ?',
+            (name, block, room_id)
+        )
+        return cursor.rowcount > 0
+
+
+# ── Cleaning Requests ──────────────────────────────────────────────────────────
+
+def create_cleaning_request(room_id, requested_by_name, requested_by_email, reason=''):
+    """Creates a new cleaning request and returns its id."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            '''INSERT INTO cleaning_requests
+               (room_id, requested_by_name, requested_by_email, reason)
+               VALUES (?, ?, ?, ?)''',
+            (room_id, requested_by_name, requested_by_email, reason)
+        )
+        return cursor.lastrowid
+
+
+def get_cleaning_requests(status_filter=None):
+    """Returns all cleaning requests, optionally filtered by status."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        if status_filter:
+            cursor.execute(
+                '''SELECT cr.*, r.name as room_name, r.block as room_block
+                   FROM cleaning_requests cr
+                   JOIN rooms r ON cr.room_id = r.id
+                   WHERE cr.status = ?
+                   ORDER BY cr.created_at DESC''',
+                (status_filter,)
+            )
+        else:
+            cursor.execute(
+                '''SELECT cr.*, r.name as room_name, r.block as room_block
+                   FROM cleaning_requests cr
+                   JOIN rooms r ON cr.room_id = r.id
+                   ORDER BY cr.created_at DESC'''
+            )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_room_cleaning_requests(room_id):
+    """Returns cleaning requests for a specific room."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            '''SELECT * FROM cleaning_requests
+               WHERE room_id = ?
+               ORDER BY created_at DESC''',
+            (room_id,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def update_cleaning_request_status(request_id, new_status):
+    """Updates a cleaning request status. Returns True if updated."""
+    from datetime import datetime
+    resolved_at = datetime.utcnow().isoformat() if new_status in ('completed', 'dismissed') else None
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE cleaning_requests SET status = ?, resolved_at = ? WHERE id = ?',
+            (new_status, resolved_at, request_id)
+        )
+        return cursor.rowcount > 0
+
+
+def get_pending_request_count():
+    """Returns count of pending cleaning requests."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM cleaning_requests WHERE status = 'pending'")
+        return cursor.fetchone()['cnt']
+
+
+# ── Notifications ──────────────────────────────────────────────────────────────
+
+def create_notification(type_, title, message='', room_id=None):
+    """Creates a new notification and returns its id."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'INSERT INTO notifications (type, title, message, room_id) VALUES (?, ?, ?, ?)',
+            (type_, title, message, room_id)
+        )
+        return cursor.lastrowid
+
+
+def get_notifications(limit=50):
+    """Returns notifications, most recent first."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?',
+            (limit,)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def mark_notification_read(notification_id):
+    """Marks a single notification as read."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'UPDATE notifications SET is_read = 1 WHERE id = ?',
+            (notification_id,)
+        )
+        return cursor.rowcount > 0
+
+
+def mark_all_notifications_read():
+    """Marks all notifications as read."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('UPDATE notifications SET is_read = 1')
+
+
+def delete_notification(notification_id):
+    """Deletes a notification."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM notifications WHERE id = ?', (notification_id,))
+        return cursor.rowcount > 0
+
+
+def get_unread_notification_count():
+    """Returns count of unread notifications."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0')
+        return cursor.fetchone()['cnt']
+
+
+def get_system_stats():
+    """Returns aggregate system statistics for the admin panel."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(*) as cnt FROM rooms')
+        total_rooms = cursor.fetchone()['cnt']
+        cursor.execute('SELECT COUNT(*) as cnt FROM scans')
+        total_scans = cursor.fetchone()['cnt']
+        cursor.execute("SELECT COUNT(*) as cnt FROM cleaning_requests WHERE status = 'pending'")
+        pending_requests = cursor.fetchone()['cnt']
+        cursor.execute("SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0")
+        unread_notifications = cursor.fetchone()['cnt']
+    return {
+        'total_rooms': total_rooms,
+        'total_scans': total_scans,
+        'pending_requests': pending_requests,
+        'unread_notifications': unread_notifications,
+    }
 
 
 def get_reports_summary(days=7):

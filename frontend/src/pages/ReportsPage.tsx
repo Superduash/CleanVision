@@ -1,359 +1,210 @@
 import { useState } from "react";
-import { format } from "date-fns";
-import { BarChart2, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { useReports } from "@/hooks/useRooms";
+import { useQuery } from "@tanstack/react-query";
+import {
+  BarChart2,
+  Download,
+  Printer,
+  TrendingUp,
+  CheckCircle2,
+  Calendar,
+} from "lucide-react";
+import { api, type ReportsSummary } from "@/lib/api";
+import { Button } from "@/components/Button";
+import { cn } from "@/lib/utils";
 
-const RANGE_OPTIONS = [
-  { label: "7 days", value: 7 },
-  { label: "14 days", value: 14 },
-  { label: "30 days", value: 30 },
-];
+function exportReportsCSV(data: ReportsSummary, days: number) {
+  const headers = ["Date", "Scans Count", "Avg Score"];
+  const rows = data.daily_trend.map((d) => [
+    `"${d.date}"`,
+    d.scan_count,
+    d.avg_score != null ? Math.round(d.avg_score) : "N/A",
+  ]);
+  const csvContent =
+    "data:text/csv;charset=utf-8," +
+    [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `cleanvision_report_${days}d.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 export function ReportsPage() {
   const [days, setDays] = useState(7);
-  const { data, isLoading, isError, refetch } = useReports(days);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["reports", days],
+    queryFn: () => api.getReports(days),
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 page-enter">
+    <div className="mx-auto max-w-5xl px-6 py-8 page-enter space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">
-            Reports & analytics
+          <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+            <BarChart2 className="h-6 w-6 text-primary" /> Reports & Insights
           </h1>
           <p className="mt-1 text-sm text-text-muted">
-            Cleanliness trends and block breakdowns.
+            Aggregated cleanliness statistics and compliance breakdown.
           </p>
         </div>
-        <div className="flex rounded-lg border border-border bg-surface p-1">
-          {RANGE_OPTIONS.map((o) => (
-            <button
-              key={o.value}
-              onClick={() => setDays(o.value)}
-              aria-pressed={days === o.value}
-              className={
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors " +
-                (days === o.value
-                  ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:text-text-primary")
-              }
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* KPI cards */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 skeleton rounded-xl" />
-          ))
-        ) : isError ? (
-          <div className="col-span-4 rounded-xl border border-border bg-surface px-6 py-8 text-center">
-            <p className="font-medium text-text-primary">
-              Couldn&apos;t load reports
-            </p>
-            <button
-              onClick={() => refetch()}
-              className="mt-2 text-sm text-primary hover:underline"
-            >
-              Try again
-            </button>
-          </div>
-        ) : (
-          <>
-            <KpiCard
-              label="Scans today"
-              value={data!.today_count}
-              suffix="scans"
-            />
-            <KpiCard
-              label="Avg score today"
-              value={data!.avg_score_today.toFixed(1)}
-              suffix="/ 100"
-            />
-            <KpiCard
-              label="Clean rooms"
-              value={data!.status_counts.clean}
-              tone="success"
-            />
-            <KpiCard
-              label="Need attention"
-              value={
-                data!.status_counts.needs_attention + data!.status_counts.dirty
-              }
-              tone={
-                data!.status_counts.dirty > 0
-                  ? "danger"
-                  : data!.status_counts.needs_attention > 0
-                  ? "warning"
-                  : "success"
-              }
-            />
-          </>
-        )}
-      </div>
-
-      {/* Daily trend chart */}
-      <div className="mt-6 rounded-xl border border-border bg-surface p-6">
-        <h2 className="flex items-center gap-2 font-semibold text-text-primary">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          Average cleanliness score — last {days} days
-        </h2>
-
-        {isLoading ? (
-          <div className="mt-4 h-48 skeleton rounded-lg" />
-        ) : isError || !data ? null : (
-          <TrendChart data={data.daily_trend} />
-        )}
-      </div>
-
-      {/* Status donut */}
-      {!isLoading && !isError && data && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <h2 className="font-semibold text-text-primary">
-              Room status breakdown
-            </h2>
-            <StatusDonut counts={data.status_counts} />
-          </div>
-
-          {/* Block breakdown table */}
-          <div className="rounded-xl border border-border bg-surface p-6">
-            <h2 className="flex items-center gap-2 font-semibold text-text-primary">
-              <BarChart2 className="h-4 w-4 text-primary" />
-              By block
-            </h2>
-            {data.block_breakdown.length === 0 ? (
-              <p className="mt-4 text-sm text-text-muted">No data yet.</p>
-            ) : (
-              <div className="mt-4 overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-bg">
-                      <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-text-muted">
-                        Block
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">
-                        Rooms
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">
-                        Avg score
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold uppercase tracking-wide text-text-muted">
-                        Need attention
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {data.block_breakdown.map((b) => (
-                      <tr key={b.block} className="hover:bg-bg transition-colors">
-                        <td className="px-4 py-2.5 font-medium text-text-primary">
-                          {b.block}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-mono text-text-primary">
-                          {b.room_count}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-mono text-text-primary">
-                          {b.avg_score != null ? b.avg_score.toFixed(1) : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-mono">
-                          <span
-                            className={
-                              b.attention_count > 0
-                                ? "text-danger"
-                                : "text-success"
-                            }
-                          >
-                            {b.attention_count}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function KpiCard({
-  label,
-  value,
-  suffix,
-  tone,
-}: {
-  label: string;
-  value: number | string;
-  suffix?: string;
-  tone?: "success" | "warning" | "danger";
-}) {
-  const color = tone
-    ? { success: "text-success", warning: "text-warning", danger: "text-danger" }[tone]
-    : "text-text-primary";
-  return (
-    <div className="rounded-xl border border-border bg-surface p-4">
-      <p className="text-xs font-medium text-text-muted">{label}</p>
-      <p className={`mt-1 font-mono text-2xl font-semibold ${color}`}>
-        {value}
-        {suffix && (
-          <span className="ml-1 text-sm font-normal text-text-muted">
-            {suffix}
-          </span>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function TrendChart({
-  data,
-}: {
-  data: Array<{ date: string; avg_score: number; scan_count: number }>;
-}) {
-  const max = Math.max(...data.map((d) => d.avg_score), 1);
-
-  return (
-    <div className="mt-4">
-      {data.every((d) => d.scan_count === 0) ? (
-        <div className="flex h-48 items-center justify-center text-sm text-text-muted">
-          No scans recorded in this period.
-        </div>
-      ) : (
-        <>
-          {/* Bar chart */}
-          <div
-            className="flex items-end gap-1.5 overflow-x-auto no-scrollbar"
-            style={{ height: 160 }}
-            role="img"
-            aria-label="Daily average cleanliness score bar chart"
-          >
-            {data.map((d) => {
-              const height = d.scan_count > 0 ? (d.avg_score / max) * 100 : 0;
-              const color =
-                d.avg_score >= 70
-                  ? "bg-success"
-                  : d.avg_score >= 40
-                  ? "bg-warning"
-                  : d.avg_score > 0
-                  ? "bg-danger"
-                  : "bg-border";
-              return (
-                <div
-                  key={d.date}
-                  className="group relative flex min-w-[28px] flex-1 flex-col items-center justify-end"
-                  style={{ height: "100%" }}
-                >
-                  <div
-                    className={`w-full rounded-t-md transition-all ${color}`}
-                    style={{ height: `${height}%`, minHeight: d.scan_count > 0 ? 4 : 0 }}
-                  />
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-1 hidden rounded bg-ink/80 px-2 py-1 text-[11px] text-white group-hover:block whitespace-nowrap">
-                    {d.scan_count > 0
-                      ? `${d.avg_score} avg · ${d.scan_count} scan${d.scan_count !== 1 ? "s" : ""}`
-                      : "No scans"}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {/* X-axis labels */}
-          <div className="mt-2 flex gap-1.5 overflow-x-auto no-scrollbar">
-            {data.map((d) => (
-              <p
-                key={d.date}
-                className="min-w-[28px] flex-1 text-center text-[10px] text-text-muted"
+        <div className="flex items-center gap-2">
+          {data && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => exportReportsCSV(data, days)}
+                className="gap-1.5"
               >
-                {format(new Date(d.date + "T00:00:00"), "dd/MM")}
-              </p>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function StatusDonut({
-  counts,
-}: {
-  counts: { clean: number; needs_attention: number; dirty: number };
-}) {
-  const total = counts.clean + counts.needs_attention + counts.dirty;
-
-  if (total === 0) {
-    return (
-      <p className="mt-4 text-sm text-text-muted">No rooms scanned yet.</p>
-    );
-  }
-
-  const segments = [
-    { label: "Clean", value: counts.clean, color: "bg-success", text: "text-success" },
-    { label: "Needs attention", value: counts.needs_attention, color: "bg-warning", text: "text-warning" },
-    { label: "Dirty", value: counts.dirty, color: "bg-danger", text: "text-danger" },
-  ];
-
-  const TrendIcon =
-    counts.dirty > 0
-      ? TrendingDown
-      : counts.needs_attention > 0
-      ? Minus
-      : TrendingUp;
-
-  return (
-    <div className="mt-4 space-y-3">
-      {/* Progress bar */}
-      <div className="flex h-4 w-full overflow-hidden rounded-full bg-border">
-        {segments.map((s) =>
-          s.value > 0 ? (
-            <div
-              key={s.label}
-              className={`${s.color} transition-all`}
-              style={{ width: `${(s.value / total) * 100}%` }}
-              title={`${s.label}: ${s.value}`}
-            />
-          ) : null,
-        )}
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handlePrint}
+                className="gap-1.5"
+              >
+                <Printer className="h-4 w-4" /> Print Report
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="space-y-2">
-        {segments.map((s) => (
-          <div key={s.label} className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className={`h-2.5 w-2.5 rounded-full ${s.color}`} />
-              <span className="text-sm text-text-muted">{s.label}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className={`font-mono text-sm font-semibold ${s.text}`}>
-                {s.value}
-              </span>
-              <span className="text-xs text-text-disabled">
-                {total > 0
-                  ? `${Math.round((s.value / total) * 100)}%`
-                  : "—"}
-              </span>
-            </div>
-          </div>
+      {/* Period Filter */}
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1 w-fit shadow-card">
+        {[7, 14, 30].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={cn(
+              "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all",
+              days === d
+                ? "bg-primary text-white shadow-sm"
+                : "text-text-muted hover:text-text-primary"
+            )}
+          >
+            Last {d} Days
+          </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-1.5 pt-1 text-xs text-text-muted">
-        <TrendIcon className="h-3.5 w-3.5" />
-        <span>
-          {counts.dirty > 0
-            ? `${counts.dirty} room${counts.dirty !== 1 ? "s" : ""} require immediate attention`
-            : counts.needs_attention > 0
-            ? `${counts.needs_attention} room${counts.needs_attention !== 1 ? "s" : ""} should be monitored`
-            : "All scanned rooms are clean"}
-        </span>
+      {/* KPI Cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+          <div className="flex items-center justify-between text-text-muted">
+            <span className="text-xs font-semibold uppercase tracking-wider">Total Scans ({days}d)</span>
+            <Calendar className="h-4 w-4 text-primary" />
+          </div>
+          <p className="mt-2 text-3xl font-bold text-text-primary">
+            {isLoading ? <span className="inline-block w-12 h-7 skeleton rounded" /> : data?.today_count ?? 0}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+          <div className="flex items-center justify-between text-text-muted">
+            <span className="text-xs font-semibold uppercase tracking-wider">Avg Score ({days}d)</span>
+            <TrendingUp className="h-4 w-4 text-accent" />
+          </div>
+          <p className="mt-2 text-3xl font-bold text-text-primary">
+            {isLoading ? (
+              <span className="inline-block w-12 h-7 skeleton rounded" />
+            ) : data?.avg_score_today != null ? (
+              Math.round(data.avg_score_today)
+            ) : (
+              "—"
+            )}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
+          <div className="flex items-center justify-between text-text-muted">
+            <span className="text-xs font-semibold uppercase tracking-wider">Clean Rate</span>
+            <CheckCircle2 className="h-4 w-4 text-success" />
+          </div>
+          <p className="mt-2 text-3xl font-bold text-success">
+            {isLoading ? (
+              <span className="inline-block w-12 h-7 skeleton rounded" />
+            ) : data?.status_counts ? (
+              `${Math.round(
+                ((data.status_counts.clean ?? 0) /
+                  Math.max(
+                    1,
+                    (data.status_counts.clean ?? 0) +
+                      (data.status_counts.needs_attention ?? 0) +
+                      (data.status_counts.dirty ?? 0)
+                  )) *
+                  100
+              )}%`
+            ) : (
+              "0%"
+            )}
+          </p>
+        </div>
       </div>
+
+      {/* Chart Section */}
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card space-y-4">
+        <h2 className="text-base font-bold text-text-primary">Daily Cleanliness Score Trend</h2>
+        <div className="h-48 flex items-end justify-between gap-2 pt-6 border-b border-border">
+          {isLoading &&
+            Array.from({ length: days }).map((_, i) => (
+              <div key={i} className="flex-1 h-full skeleton rounded-t-lg" />
+            ))}
+
+          {!isLoading &&
+            data?.daily_trend?.map((item) => {
+              const score = item.avg_score ?? 0;
+              const heightPct = Math.max(10, score);
+              const barColor =
+                score >= 80 ? "bg-success" : score >= 60 ? "bg-warning" : "bg-danger";
+
+              return (
+                <div key={item.date} className="flex flex-1 flex-col items-center gap-2 h-full justify-end group">
+                  <span className="text-[10px] font-mono font-bold text-text-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                    {score ? Math.round(score) : "—"}
+                  </span>
+                  <div
+                    className={cn("w-full rounded-t-md transition-all group-hover:brightness-110", barColor)}
+                    style={{ height: `${heightPct}%` }}
+                  />
+                  <span className="text-[10px] text-text-disabled truncate w-full text-center">
+                    {item.date.slice(5)}
+                  </span>
+                </div>
+              );
+            })}
+        </div>
+      </div>
+
+      {/* Block Breakdown */}
+      {data?.block_breakdown && (
+        <div className="rounded-xl border border-border bg-surface p-6 shadow-card space-y-4">
+          <h2 className="text-base font-bold text-text-primary">Breakdown by Hospital Block</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Object.entries(data.block_breakdown).map(([block, stats]) => (
+              <div key={block} className="rounded-lg border border-border bg-bg p-4 flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-text-primary">{block}</h4>
+                  <p className="text-xs text-text-muted">{stats.room_count} rooms</p>
+                </div>
+                <span className="font-mono text-lg font-bold text-primary">
+                  {stats.avg_score != null ? Math.round(stats.avg_score) : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

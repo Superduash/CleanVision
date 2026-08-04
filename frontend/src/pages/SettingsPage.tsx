@@ -1,199 +1,232 @@
 import { useState } from "react";
-import { Moon, Sun, Bell, Shield, Database, Info } from "lucide-react";
-import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
+import { updatePassword, deleteUser, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { toast } from "sonner";
+import {
+  Settings,
+  Sun,
+  Moon,
+  Lock,
+  Bell,
+  Trash2,
+  KeyRound,
+  X,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/Button";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { Input } from "@/components/Input";
+import { cn } from "@/lib/utils";
 
-export function SettingsPage() {
-  const { theme, toggle } = useTheme();
-  const [notifEnabled, setNotifEnabled] = useState(false);
+// ── Password Change Modal ─────────────────────────────────────────────────────
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { data: health } = useQuery({
-    queryKey: ["health"],
-    queryFn: api.health,
-    staleTime: 60_000,
-  });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPw || !newPw || !confirmPw) {
+      toast.error("Please fill in all fields.");
+      return;
+    }
+    if (newPw.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPw !== confirmPw) {
+      toast.error("New passwords do not match.");
+      return;
+    }
 
-  const handleNotifToggle = () => {
-    const next = !notifEnabled;
-    setNotifEnabled(next);
-    toast.success(
-      next
-        ? "Dirty-room notifications enabled for this session."
-        : "Notifications disabled.",
-    );
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      toast.error("User session not found.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Reauthenticate user before changing password
+      const cred = EmailAuthProvider.credential(user.email, currentPw);
+      await reauthenticateWithCredential(user, cred);
+      await updatePassword(user, newPw);
+      toast.success("Password updated successfully!");
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("wrong-password") || msg.includes("invalid-credential")) {
+        toast.error("Current password is incorrect.");
+      } else {
+        toast.error("Failed to update password. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-8 page-enter">
-      <h1 className="text-2xl font-semibold text-text-primary">Settings</h1>
-      <p className="mt-1 text-sm text-text-muted">
-        Appearance, notifications, and system information.
-      </p>
-
-      <div className="mt-8 space-y-4">
-        {/* Appearance */}
-        <SettingsSection
-          icon={theme === "dark" ? Moon : Sun}
-          title="Appearance"
-          description="Choose your preferred color scheme."
-        >
-          <div className="flex gap-2">
-            <button
-              onClick={() => theme === "dark" && toggle()}
-              aria-pressed={theme === "light"}
-              className={
-                "flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors " +
-                (theme === "light"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-text-muted hover:bg-bg")
-              }
-            >
-              <Sun className="h-4 w-4" />
-              Light
-            </button>
-            <button
-              onClick={() => theme === "light" && toggle()}
-              aria-pressed={theme === "dark"}
-              className={
-                "flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors " +
-                (theme === "dark"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-text-muted hover:bg-bg")
-              }
-            >
-              <Moon className="h-4 w-4" />
-              Dark
-            </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-border bg-surface p-6 shadow-raised">
+        <button onClick={onClose} className="absolute right-4 top-4 text-text-disabled hover:text-text-muted">
+          <X className="h-4 w-4" />
+        </button>
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+          <KeyRound className="h-5 w-5 text-primary" />
+        </div>
+        <h3 className="mt-3 text-lg font-bold text-text-primary">Change Password</h3>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <Input
+            label="Current Password"
+            type="password"
+            placeholder="••••••••"
+            value={currentPw}
+            onChange={(e) => setCurrentPw(e.target.value)}
+          />
+          <Input
+            label="New Password"
+            type="password"
+            placeholder="Min 8 characters"
+            value={newPw}
+            onChange={(e) => setNewPw(e.target.value)}
+          />
+          <Input
+            label="Confirm New Password"
+            type="password"
+            placeholder="••••••••"
+            value={confirmPw}
+            onChange={(e) => setConfirmPw(e.target.value)}
+          />
+          <div className="mt-5 flex gap-3">
+            <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" isLoading={isLoading}>
+              Update
+            </Button>
           </div>
-        </SettingsSection>
-
-        {/* Notifications (UI-only: no push endpoint on backend) */}
-        <SettingsSection
-          icon={Bell}
-          title="Dirty-room alerts"
-          description="Show a notification when a room is marked dirty."
-        >
-          <label className="flex cursor-pointer items-center gap-3">
-            <div
-              role="switch"
-              aria-checked={notifEnabled}
-              onClick={handleNotifToggle}
-              onKeyDown={(e) => e.key === "Enter" && handleNotifToggle()}
-              tabIndex={0}
-              className={
-                "relative h-6 w-11 rounded-full transition-colors " +
-                (notifEnabled ? "bg-primary" : "bg-border")
-              }
-            >
-              <span
-                className={
-                  "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform " +
-                  (notifEnabled ? "translate-x-5" : "translate-x-0.5")
-                }
-              />
-            </div>
-            <span className="text-sm text-text-primary">
-              {notifEnabled ? "On" : "Off"}
-            </span>
-          </label>
-          <p className="mt-2 text-xs text-text-disabled">
-            ⚠️ Frontend-only — alerts appear only within this session.
-          </p>
-        </SettingsSection>
-
-        {/* Security (stub) */}
-        <SettingsSection
-          icon={Shield}
-          title="Security"
-          description="Password and authentication settings."
-        >
-          <Button variant="secondary" size="sm" onClick={() => toast.info("Backend auth is not wired up yet.")}>
-            Change password
-          </Button>
-          <p className="mt-2 text-xs text-text-disabled">
-            ⚠️ The backend doesn&apos;t expose auth endpoints yet. Password
-            management will be available once auth is added.
-          </p>
-        </SettingsSection>
-
-        {/* System info */}
-        <SettingsSection
-          icon={Database}
-          title="System"
-          description="Backend and model information."
-        >
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Backend status</dt>
-              <dd className="font-medium text-success">
-                {health ? "Online" : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-text-muted">AI model</dt>
-              <dd className="text-text-primary">
-                {health?.mock_mode === true
-                  ? "Mock mode (no model loaded)"
-                  : health?.mock_mode === false
-                  ? "MobileNetV2 loaded"
-                  : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Score range</dt>
-              <dd className="font-mono text-text-primary">0 – 100</dd>
-            </div>
-          </dl>
-        </SettingsSection>
-
-        {/* About */}
-        <SettingsSection
-          icon={Info}
-          title="About CleanVision"
-          description="Version and license information."
-        >
-          <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Version</dt>
-              <dd className="font-mono text-text-primary">1.0.0</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-text-muted">License</dt>
-              <dd className="text-text-primary">MIT</dd>
-            </div>
-          </dl>
-        </SettingsSection>
+        </form>
       </div>
     </div>
   );
 }
 
-function SettingsSection({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  children: React.ReactNode;
-}) {
+export function SettingsPage() {
+  const { signOut } = useAuth();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+
+  const handleDeleteAccount = async () => {
+    if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
+    const user = auth.currentUser;
+    if (user) {
+      try {
+        await deleteUser(user);
+        toast.success("Account deleted.");
+        await signOut();
+      } catch {
+        toast.error("Please re-authenticate before deleting your account.");
+      }
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10">
-          <Icon className="h-4 w-4 text-primary" strokeWidth={2} />
-        </div>
-        <div>
-          <p className="font-semibold text-text-primary">{title}</p>
-          <p className="text-xs text-text-muted">{description}</p>
+    <div className="mx-auto max-w-3xl px-6 py-8 page-enter space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
+          <Settings className="h-6 w-6 text-primary" /> Settings
+        </h1>
+        <p className="mt-1 text-sm text-text-muted">
+          Manage your account security, interface theme, and preferences.
+        </p>
+      </div>
+
+      {/* Theme Section */}
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card space-y-4">
+        <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+          {theme === "dark" ? <Moon className="h-4 w-4 text-accent" /> : <Sun className="h-4 w-4 text-warning" />}
+          Appearance
+        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Interface Theme</p>
+            <p className="text-xs text-text-muted">
+              Current: <strong className="capitalize">{theme} mode</strong> (Light by default)
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={toggleTheme} className="gap-2">
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            Switch to {theme === "dark" ? "Light" : "Dark"}
+          </Button>
         </div>
       </div>
-      <div className="mt-4 pl-12">{children}</div>
+
+      {/* Security Section */}
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card space-y-4">
+        <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+          <Lock className="h-4 w-4 text-primary" /> Security
+        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Password</p>
+            <p className="text-xs text-text-muted">Update your account password</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => setShowPasswordModal(true)} className="gap-2">
+            <KeyRound className="h-4 w-4" /> Change Password
+          </Button>
+        </div>
+      </div>
+
+      {/* Notifications Section */}
+      <div className="rounded-xl border border-border bg-surface p-6 shadow-card space-y-4">
+        <h2 className="text-base font-bold text-text-primary flex items-center gap-2">
+          <Bell className="h-4 w-4 text-primary" /> Notifications
+        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Scan Alerts</p>
+            <p className="text-xs text-text-muted">Receive alerts when rooms score low on cleanliness</p>
+          </div>
+          <button
+            onClick={() => setNotificationsEnabled((v) => !v)}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out",
+              notificationsEnabled ? "bg-primary" : "bg-border"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                notificationsEnabled ? "translate-x-5" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="rounded-xl border border-danger/30 bg-danger-bg/20 p-6 shadow-card space-y-4">
+        <h2 className="text-base font-bold text-danger flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-danger" /> Danger Zone
+        </h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-text-primary">Delete Account</p>
+            <p className="text-xs text-text-muted">Permanently remove your account and credentials</p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={handleDeleteAccount} className="border-danger/40 text-danger hover:bg-danger-bg gap-2">
+            <Trash2 className="h-4 w-4" /> Delete Account
+          </Button>
+        </div>
+      </div>
+
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
     </div>
   );
 }

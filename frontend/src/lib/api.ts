@@ -148,6 +148,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 }
 
+/** One cleaning request record */
+export interface CleaningRequest {
+  id: number;
+  room_id: number;
+  room_name: string;
+  room_block: string;
+  requested_by_name: string;
+  requested_by_email: string;
+  reason: string;
+  status: "pending" | "in_progress" | "completed" | "dismissed";
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** One notification record */
+export interface Notification {
+  id: number;
+  type: "scan_result" | "cleaning_request" | "request_update";
+  title: string;
+  message: string;
+  room_id: number | null;
+  is_read: 0 | 1;
+  created_at: string;
+}
+
 export const api = {
   health: () => request<{ status: string; mock_mode?: boolean }>("/api/health"),
 
@@ -165,6 +190,19 @@ export const api = {
       body: form,
     });
   },
+
+  updateRoom: (roomId: number, input: { name: string; block: string }) => {
+    const form = new FormData();
+    form.append("name", input.name);
+    form.append("block", input.block);
+    return request<{ success: boolean }>(`/api/rooms/${roomId}`, {
+      method: "PATCH",
+      body: form,
+    });
+  },
+
+  deleteRoom: (roomId: number) =>
+    request<void>(`/api/rooms/${roomId}`, { method: "DELETE" }),
 
   uploadBaseline: (roomId: number, image: File) => {
     const form = new FormData();
@@ -187,10 +225,79 @@ export const api = {
       `/api/rooms/${roomId}/history?limit=${limit}`,
     ),
 
+  deleteScan: (scanId: number) =>
+    request<void>(`/api/scans/${scanId}`, { method: "DELETE" }),
+
   getSummary: () => request<SummaryReport>("/api/reports/summary"),
 
   getReports: (days = 7) =>
     request<ReportsSummary>(`/api/reports/summary?days=${days}`),
+
+  // ── Cleaning Requests ────────────────────────────────────────────
+  createCleaningRequest: (input: {
+    room_id: number;
+    requested_by_name: string;
+    requested_by_email: string;
+    reason?: string;
+  }) => {
+    const form = new FormData();
+    form.append("room_id", String(input.room_id));
+    form.append("requested_by_name", input.requested_by_name);
+    form.append("requested_by_email", input.requested_by_email);
+    form.append("reason", input.reason ?? "");
+    return request<{ success: boolean; request_id: number }>(
+      "/api/cleaning-requests",
+      { method: "POST", body: form },
+    );
+  },
+
+  getCleaningRequests: (status?: string) =>
+    request<{ requests: CleaningRequest[]; pending_count: number }>(
+      status ? `/api/cleaning-requests?status=${status}` : "/api/cleaning-requests",
+    ),
+
+  updateCleaningRequest: (requestId: number, status: string) => {
+    const form = new FormData();
+    form.append("status", status);
+    return request<{ success: boolean }>(
+      `/api/cleaning-requests/${requestId}`,
+      { method: "PATCH", body: form },
+    );
+  },
+
+  getRoomCleaningRequests: (roomId: number) =>
+    request<{ requests: CleaningRequest[] }>(
+      `/api/rooms/${roomId}/cleaning-requests`,
+    ),
+
+  // ── Notifications ────────────────────────────────────────────────
+  getNotifications: (limit = 50) =>
+    request<{ notifications: Notification[]; unread_count: number }>(
+      `/api/notifications?limit=${limit}`,
+    ),
+
+  markNotificationRead: (id: number) =>
+    request<{ success: boolean }>(`/api/notifications/${id}/read`, {
+      method: "PATCH",
+    }),
+
+  markAllNotificationsRead: () =>
+    request<{ success: boolean }>("/api/notifications/mark-all-read", {
+      method: "POST",
+    }),
+
+  deleteNotification: (id: number) =>
+    request<void>(`/api/notifications/${id}`, { method: "DELETE" }),
+
+  // ── Admin ────────────────────────────────────────────────────────
+  getAdminStats: () =>
+    request<{
+      total_rooms: number;
+      total_scans: number;
+      pending_requests: number;
+      unread_notifications: number;
+      mock_mode: boolean;
+    }>("/api/admin/stats"),
 };
 
 export const STATUS_LABEL: Record<RoomStatus, string> = {

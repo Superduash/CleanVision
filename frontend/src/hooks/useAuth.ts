@@ -1,24 +1,36 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail,
+  updateProfile,
+  type User,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { isAdminEmail, SUPER_ADMIN_EMAIL } from "@/lib/adminService";
 
-/**
- * LOCAL AUTH — the backend does not expose auth endpoints yet.
- * This stores a lightweight local session so Login/Signup and the protected
- * dashboard route are fully navigable and demoable.
- *
- * Two built-in demo accounts are pre-seeded:
- *   Patient / Staff   → demo@gmail.com  / demo
- *   Admin / QA Mgmt   → admin@gmail.com / admin
- *
- * When the backend adds real auth, replace `signIn`/`signUp` with actual
- * API calls and drop the localStorage session.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
-export type UserRole = "admin" | "patient" | "user";
+export type UserRole = "admin" | "patient";
 
 export interface Session {
+  uid: string;
   name: string;
   email: string;
   role: UserRole;
+  photoURL: string | null;
 }
 
 interface AuthContextValue {
@@ -26,83 +38,114 @@ interface AuthContextValue {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
-  signOut: () => void;
+  signInWithGoogle: () => Promise<void>;
+  signOut: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
-const STORAGE_KEY = "cleanvision.session";
+// ─────────────────────────────────────────────────────────────────────────────
+// Context
+// ─────────────────────────────────────────────────────────────────────────────
 
-/** Pre-seeded demo accounts */
-const DEMO_ACCOUNTS: Record<string, { password: string; name: string; role: UserRole }> = {
-  "demo@gmail.com": {
-    password: "demo",
-    name: "Demo Patient",
-    role: "patient",
-  },
-  "admin@gmail.com": {
-    password: "admin",
-    name: "Admin (QA Management)",
-    role: "admin",
-  },
-};
+export const AuthContext = createContext<AuthContextValue | undefined>(
+  undefined
+);
 
-export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+// ─────────────────────────────────────────────────────────────────────────────
+// Role resolution helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function resolveRole(user: User): Promise<UserRole> {
+  const email = user.email ?? "";
+  // Super-admin always gets admin role immediately (no Firestore lookup)
+  if (email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) return "admin";
+  // Check Firestore admins collection
+  try {
+    const admin = await isAdminEmail(email);
+    return admin ? "admin" : "patient";
+  } catch {
+    return "patient";
+  }
+}
+
+async function buildSession(user: User): Promise<Session> {
+  const role = await resolveRole(user);
+  return {
+    uid: user.uid,
+    name: user.displayName ?? user.email?.split("@")[0] ?? "User",
+    email: user.email ?? "",
+    role,
+    photoURL: user.photoURL,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Provider hook
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function useProvideAuth(): AuthContextValue {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      try {
-        setSession(JSON.parse(raw));
-      } catch {
-        window.localStorage.removeItem(STORAGE_KEY);
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const s = await buildSession(user);
+        setSession(s);
+      } else {
+        setSession(null);
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    });
+    return unsub;
   }, []);
 
-  const persist = (next: Session) => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setSession(next);
-  };
+  const signIn = useCallback(async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+    // onAuthStateChanged fires and sets session automatically
+  }, []);
+
+  const signUp = useCallback(
+    async (name: string, email: string, password: string) => {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: name });
+      // Refresh session with display name
+      const s = await buildSession(cred.user);
+      setSession(s);
+    },
+    []
+  );
+
+  const signInWithGoogle = useCallback(async () => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await signInWithPopup(auth, provider);
+    // onAuthStateChanged handles the rest
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await firebaseSignOut(auth);
+    setSession(null);
+  }, []);
+
+  const sendPasswordReset = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  }, []);
 
   return {
     session,
     isLoading,
-
-    signIn: async (email, password) => {
-      await new Promise((r) => setTimeout(r, 350)); // simulate network latency
-
-      const emailKey = email.toLowerCase().trim();
-      const demo = DEMO_ACCOUNTS[emailKey];
-
-      if (demo) {
-        // Demo account — check password
-        if (demo.password !== password) {
-          throw new Error("Incorrect password. Try again.");
-        }
-        persist({ name: demo.name, email: emailKey, role: demo.role });
-        return;
-      }
-
-      // Any other credentials create a regular session
-      persist({ name: email.split("@")[0], email: emailKey, role: "user" });
-    },
-
-    signUp: async (name, email, _password) => {
-      await new Promise((r) => setTimeout(r, 350));
-      const emailKey = email.toLowerCase().trim();
-      persist({ name, email: emailKey, role: "user" });
-    },
-
-    signOut: () => {
-      window.localStorage.removeItem(STORAGE_KEY);
-      setSession(null);
-    },
+    signIn,
+    signUp,
+    signInWithGoogle,
+    signOut,
+    sendPasswordReset,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consumer hook
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext);

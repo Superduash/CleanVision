@@ -56,26 +56,20 @@ export function AddEditRoomPage() {
       toast.error(err.message || "Couldn't add the room. Try again."),
   });
 
-  // NOTE: The backend doesn't expose a PATCH /api/rooms/:id endpoint yet.
-  // Edit mode updates the local cache optimistically for now and flags this
-  // as frontend-only until the backend supports it.
   const editMutation = useMutation({
-    mutationFn: async (_values: FormValues) => {
-      // ⚠️ Frontend-only stub — backend doesn't have PATCH /api/rooms/:id yet.
-      return new Promise<void>((r) => setTimeout(r, 300));
-    },
+    mutationFn: (values: FormValues) => api.updateRoom(id, values),
     onSuccess: (_data, variables) => {
-      toast.success("Room details updated.");
-      // Optimistically update cache
-      queryClient.setQueryData(["room", id], (old: { room: typeof room } | undefined) =>
-        old
-          ? { room: { ...old.room, ...variables } }
-          : old,
+      toast.success("Room updated successfully.");
+      queryClient.setQueryData(
+        ["room", id],
+        (old: { room: typeof room } | undefined) =>
+          old ? { room: { ...old.room, ...variables } } : old,
       );
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
       navigate(`/dashboard/rooms/${id}`);
     },
-    onError: () => toast.error("Couldn't update the room. Try again."),
+    onError: (err: Error) =>
+      toast.error(err.message || "Couldn't update the room. Try again."),
   });
 
   const onSubmit = (values: FormValues) => {
@@ -134,13 +128,6 @@ export function AddEditRoomPage() {
             {...register("block")}
           />
 
-          {isEdit && (
-            <p className="rounded-lg border border-warning/30 bg-warning-bg px-4 py-3 text-xs text-warning">
-              ⚠️ Room name/block editing is currently frontend-only — the
-              backend doesn&apos;t expose a PATCH endpoint yet. Changes will
-              persist in this session but reset on refresh.
-            </p>
-          )}
 
           <div className="flex gap-3">
             <Button

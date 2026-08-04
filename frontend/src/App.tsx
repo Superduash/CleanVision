@@ -4,6 +4,7 @@ import { LandingPage } from "@/pages/LandingPage";
 import { AuthPage } from "@/pages/AuthPage";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { useAuth } from "@/hooks/useAuth";
 
 // Lazy-load all dashboard pages for code-splitting
 const DashboardPage = lazy(() =>
@@ -36,8 +37,12 @@ const ProfilePage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("@/pages/NotificationsPage").then((m) => ({ default: m.NotificationsPage })),
 );
-
-import { useAuth } from "@/hooks/useAuth";
+const AdminPanelPage = lazy(() =>
+  import("@/pages/AdminPanelPage").then((m) => ({ default: m.AdminPanelPage })),
+);
+const CleaningRequestsPage = lazy(() =>
+  import("@/pages/CleaningRequestsPage").then((m) => ({ default: m.CleaningRequestsPage })),
+);
 
 function PageLoader() {
   return (
@@ -47,14 +52,20 @@ function PageLoader() {
   );
 }
 
-function RoleGuard({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
+function RoleGuard({
+  children,
+  requireAdmin = false,
+}: {
+  children: React.ReactNode;
+  requireAdmin?: boolean;
+}) {
   const { session } = useAuth();
-  
+
   if (requireAdmin && session?.role !== "admin") {
     // If patient tries to access admin route, send them to dashboard
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
@@ -65,10 +76,7 @@ export function App() {
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/signup" element={<AuthPage mode="signup" />} />
 
-      <Route
-        path="/dashboard"
-        element={<DashboardLayout />}
-      >
+      <Route path="/dashboard" element={<DashboardLayout />}>
         <Route
           index
           element={
@@ -141,6 +149,26 @@ export function App() {
             <RoleGuard requireAdmin>
               <Suspense fallback={<PageLoader />}>
                 <ReportsPage />
+              </Suspense>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <RoleGuard requireAdmin>
+              <Suspense fallback={<PageLoader />}>
+                <AdminPanelPage />
+              </Suspense>
+            </RoleGuard>
+          }
+        />
+        <Route
+          path="cleaning-requests"
+          element={
+            <RoleGuard requireAdmin>
+              <Suspense fallback={<PageLoader />}>
+                <CleaningRequestsPage />
               </Suspense>
             </RoleGuard>
           }

@@ -184,6 +184,18 @@ def scan_image():
             room_id, relative_path, prediction["score"], prediction["status"]
         )
 
+        # Auto-create notification for attention-needed scans
+        if prediction["status"] in ("dirty", "needs_attention"):
+            status_label = "Dirty" if prediction["status"] == "dirty" else "Needs attention"
+            room_name = room.get("name", f"Room {room_id}")
+            database.create_notification(
+                "scan_result",
+                f"{status_label}: {room_name}",
+                f"{room_name} scored {prediction['score']}/100. Immediate attention required." if prediction["status"] == "dirty"
+                else f"{room_name} scored {prediction['score']}/100. Schedule a cleaning check soon.",
+                room_id
+            )
+
         return jsonify(
             {
                 "scan_id": scan_id,
@@ -220,6 +232,56 @@ def health_check():
     return jsonify({"status": "ok", "mock_mode": model.MOCK_MODE}), 200
 
 
+@app.route("/api/rooms/<int:room_id>", methods=["DELETE"])
+def delete_room(room_id):
+    """Delete a room and all its scans, including uploaded image files."""
+    try:
+        image_paths = database.delete_room(room_id)
+        if image_paths is None:
+            return jsonify({"error": "Room not found"}), 404
+
+        # Clean up uploaded image files from disk
+        backend_dir = os.path.dirname(__file__)
+        for rel_path in image_paths:
+            abs_path = os.path.join(backend_dir, rel_path)
+            try:
+                if os.path.exists(abs_path):
+                    os.remove(abs_path)
+            except OSError:
+                pass  # best-effort cleanup
+
+        cache.clear()
+        return "", 204
+    except Exception:
+        return jsonify({"error": "Failed to delete room"}), 500
+
+
+@app.route("/api/scans/<int:scan_id>", methods=["DELETE"])
+def delete_scan(scan_id):
+    """Delete a single scan record and its uploaded image."""
+    try:
+        scan = database.get_scan(scan_id)
+        if scan is None:
+            return jsonify({"error": "Scan not found"}), 404
+
+        database.delete_scan(scan_id)
+
+        # Clean up the scan image file
+        if scan.get("image_path"):
+            backend_dir = os.path.dirname(__file__)
+            abs_path = os.path.join(backend_dir, scan["image_path"])
+            try:
+                if os.path.exists(abs_path):
+                    os.remove(abs_path)
+            except OSError:
+                pass
+
+        cache.clear()
+        return "", 204
+    except Exception:
+        return jsonify({"error": "Failed to delete scan"}), 500
+
+
 @app.route("/api/reports/summary", methods=["GET"])
 @cache.cached(timeout=60, query_string=True)
 def reports_summary():
@@ -232,10 +294,174 @@ def reports_summary():
     except Exception:
         return jsonify({"error": "Failed to generate report summary"}), 500
 
+@app.route("/api/rooms/<int:room_id>", methods=["PATCH"])
+def update_room(room_id):
+    """Update a room's name and/or block."""
+    try:
+        name = request.form.get("name", "").strip()
+        block = request.form.get("block", "").strip()
+        if not name:
+            return jsonify({"error": "Room name is required"}), 400
+        if not block:
+            return jsonify({"error": "Block is required"}), 400
+        if len(name) > 100:
+            return jsonify({"error": "Room name must be 100 characters or fewer"}), 400
+        updated = database.update_room(room_id, name, block)
+        if not updated:
+            return jsonify({"error": "Room not found"}), 404
+        cache.clear()
+        return jsonify({"success": True}), 200
+    except Exception:
+        return jsonify({"error": "Failed to update room"}), 500
+
 
 # --------------------------------------------------------------------------- #
-# Uploaded-image Serving                                                        #
+# Cleaning Requests                                                             #
 # --------------------------------------------------------------------------- #
+
+@app.route("/api/cleaning-requests", methods=["POST"])
+def create_cleaning_request():
+    """Submit a new cleaning request."""
+    try:
+        room_id_str = request.form.get("room_id", "")
+        if not room_id_str:
+            return jsonify({"error": "room_id is required"}), 400
+        try:
+            room_id = int(room_id_str)
+        except ValueError:
+            return jsonify({"error": "room_id must be an integer"}), 400
+
+        room = database.get_room(room_id)
+        if room is None:
+            return jsonify({"error": "Room not found"}), 404
+
+        requested_by_name = request.form.get("requested_by_name", "Patient").strip()
+        requested_by_email = request.form.get("requested_by_email", "").strip()
+        reason = request.form.get("reason", "").strip()
+
+        req_id = database.create_cleaning_request(room_id, requested_by_name, requested_by_email, reason)
+
+        # Auto-notify admins
+        database.create_notification(
+            "cleaning_request",
+            f"Cleaning requested: {room['name']}",
+            f"{requested_by_name} requested cleaning for {room['name']} ({room['block']}). Reason: {reason or 'Not specified'}",
+            room_id
+        )
+
+        return jsonify({"success": True, "request_id": req_id}), 201
+    except Exception:
+        return jsonify({"error": "Failed to submit cleaning request"}), 500
+
+
+@app.route("/api/cleaning-requests", methods=["GET"])
+def get_cleaning_requests():
+    """List all cleaning requests (optionally filtered by status)."""
+    try:
+        status_filter = request.args.get("status")
+        requests_list = database.get_cleaning_requests(status_filter)
+        pending_count = database.get_pending_request_count()
+        return jsonify({"requests": requests_list, "pending_count": pending_count}), 200
+    except Exception:
+        return jsonify({"error": "Failed to fetch cleaning requests"}), 500
+
+
+@app.route("/api/cleaning-requests/<int:request_id>", methods=["PATCH"])
+def update_cleaning_request(request_id):
+    """Update cleaning request status (admin action)."""
+    try:
+        new_status = request.form.get("status", "").strip()
+        valid = {"pending", "in_progress", "completed", "dismissed"}
+        if new_status not in valid:
+            return jsonify({"error": f"Status must be one of: {', '.join(valid)}"}), 400
+        updated = database.update_cleaning_request_status(request_id, new_status)
+        if not updated:
+            return jsonify({"error": "Request not found"}), 404
+        return jsonify({"success": True}), 200
+    except Exception:
+        return jsonify({"error": "Failed to update request"}), 500
+
+
+@app.route("/api/rooms/<int:room_id>/cleaning-requests", methods=["GET"])
+def get_room_cleaning_requests(room_id):
+    """Get cleaning requests for a specific room."""
+    try:
+        room = database.get_room(room_id)
+        if room is None:
+            return jsonify({"error": "Room not found"}), 404
+        requests_list = database.get_room_cleaning_requests(room_id)
+        return jsonify({"requests": requests_list}), 200
+    except Exception:
+        return jsonify({"error": "Failed to fetch requests"}), 500
+
+
+# --------------------------------------------------------------------------- #
+# Notifications                                                                 #
+# --------------------------------------------------------------------------- #
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    """List notifications, most recent first."""
+    try:
+        limit = request.args.get("limit", 50, type=int)
+        limit = max(1, min(limit, 200))
+        notifications = database.get_notifications(limit)
+        unread_count = database.get_unread_notification_count()
+        return jsonify({"notifications": notifications, "unread_count": unread_count}), 200
+    except Exception:
+        return jsonify({"error": "Failed to fetch notifications"}), 500
+
+
+@app.route("/api/notifications/<int:notification_id>/read", methods=["PATCH"])
+def mark_notification_read(notification_id):
+    """Mark a notification as read."""
+    try:
+        updated = database.mark_notification_read(notification_id)
+        if not updated:
+            return jsonify({"error": "Notification not found"}), 404
+        return jsonify({"success": True}), 200
+    except Exception:
+        return jsonify({"error": "Failed to mark notification"}), 500
+
+
+@app.route("/api/notifications/mark-all-read", methods=["POST"])
+def mark_all_notifications_read():
+    """Mark all notifications as read."""
+    try:
+        database.mark_all_notifications_read()
+        return jsonify({"success": True}), 200
+    except Exception:
+        return jsonify({"error": "Failed to mark all notifications"}), 500
+
+
+@app.route("/api/notifications/<int:notification_id>", methods=["DELETE"])
+def delete_notification(notification_id):
+    """Delete a notification."""
+    try:
+        deleted = database.delete_notification(notification_id)
+        if not deleted:
+            return jsonify({"error": "Notification not found"}), 404
+        return "", 204
+    except Exception:
+        return jsonify({"error": "Failed to delete notification"}), 500
+
+
+# --------------------------------------------------------------------------- #
+# Admin Stats                                                                   #
+# --------------------------------------------------------------------------- #
+
+@app.route("/api/admin/stats", methods=["GET"])
+def admin_stats():
+    """System statistics for admin panel."""
+    try:
+        stats = database.get_system_stats()
+        stats["mock_mode"] = model.MOCK_MODE
+        return jsonify(stats), 200
+    except Exception:
+        return jsonify({"error": "Failed to fetch stats"}), 500
+
+
+
 
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
