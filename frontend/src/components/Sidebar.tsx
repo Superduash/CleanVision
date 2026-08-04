@@ -66,7 +66,7 @@ export function Sidebar() {
       <div className="space-y-6">
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2.5 px-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white shadow-primary-glow">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
@@ -89,7 +89,7 @@ export function Sidebar() {
                 cn(
                   "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm font-semibold transition-all",
                   isActive
-                    ? "bg-primary text-white shadow-primary-glow"
+                    ? "bg-primary text-white"
                     : "text-text-muted hover:bg-highlight hover:text-text-primary"
                 )
               }
@@ -118,7 +118,7 @@ export function Sidebar() {
               cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all",
                 isActive
-                  ? "bg-primary text-white shadow-primary-glow"
+                  ? "bg-primary text-white"
                   : "text-text-muted hover:bg-highlight hover:text-text-primary"
               )
             }

@@ -3,8 +3,17 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { LandingPage } from "@/pages/LandingPage";
 import { AuthPage } from "@/pages/AuthPage";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { PublicLayout } from "@/components/PublicLayout";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { useAuth } from "@/hooks/useAuth";
+
+// Lazy-load new public pages
+const FeaturesPage = lazy(() => import("@/pages/FeaturesPage").then(m => ({ default: m.FeaturesPage })));
+const DocsPage = lazy(() => import("@/pages/DocsPage").then(m => ({ default: m.DocsPage })));
+const ApiReferencePage = lazy(() => import("@/pages/ApiReferencePage").then(m => ({ default: m.ApiReferencePage })));
+const ContactPage = lazy(() => import("@/pages/ContactPage").then(m => ({ default: m.ContactPage })));
+const PrivacyPage = lazy(() => import("@/pages/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import("@/pages/TermsPage").then(m => ({ default: m.TermsPage })));
 
 // Lazy-load all dashboard pages for code-splitting
 const DashboardPage = lazy(() =>
@@ -72,7 +81,29 @@ function RoleGuard({
 export function App() {
   return (
     <Routes>
-      <Route path="/" element={<LandingPage />} />
+      {/* Public Pages */}
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/features" element={
+          <Suspense fallback={<PageLoader />}><FeaturesPage /></Suspense>
+        } />
+        <Route path="/docs" element={
+          <Suspense fallback={<PageLoader />}><DocsPage /></Suspense>
+        } />
+        <Route path="/api" element={
+          <Suspense fallback={<PageLoader />}><ApiReferencePage /></Suspense>
+        } />
+        <Route path="/contact" element={
+          <Suspense fallback={<PageLoader />}><ContactPage /></Suspense>
+        } />
+        <Route path="/privacy" element={
+          <Suspense fallback={<PageLoader />}><PrivacyPage /></Suspense>
+        } />
+        <Route path="/terms" element={
+          <Suspense fallback={<PageLoader />}><TermsPage /></Suspense>
+        } />
+      </Route>
+
       <Route path="/login" element={<AuthPage mode="login" />} />
       <Route path="/signup" element={<AuthPage mode="signup" />} />
 

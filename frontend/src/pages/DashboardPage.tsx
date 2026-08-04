@@ -155,9 +155,9 @@ export function DashboardPage() {
   );
 
   const totalCount = rooms.length;
-  const cleanCount = rooms.filter((r) => r.latest_status === "clean").length;
-  const needsCount = rooms.filter((r) => r.latest_status === "needs_attention").length;
-  const dirtyCount = rooms.filter((r) => r.latest_status === "dirty").length;
+  const cleanCount = summary?.status_counts?.clean ?? rooms.filter((r) => r.latest_status === "clean").length;
+  const needsCount = summary?.status_counts?.needs_attention ?? rooms.filter((r) => r.latest_status === "needs_attention").length;
+  const dirtyCount = summary?.status_counts?.dirty ?? rooms.filter((r) => r.latest_status === "dirty").length;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 page-enter space-y-8">
@@ -183,7 +183,7 @@ export function DashboardPage() {
           {isAdmin ? (
             <>
               <Link to="/dashboard/scan">
-                <Button size="sm" className="gap-1.5 shadow-primary-glow">
+                <Button size="sm" className="gap-1.5">
                   <ScanLine className="h-4 w-4" /> New Scan
                 </Button>
               </Link>
@@ -248,7 +248,7 @@ export function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-accent" />
             </div>
             <p className="mt-2 text-3xl font-bold text-text-primary">
-              {summary ? Math.round(summary.average_score) : "—"}
+              {summary && summary.avg_score_today !== undefined ? Math.round(summary.avg_score_today) : "—"}
             </p>
             <p className="mt-1 text-xs text-text-muted">Target: 85+</p>
           </div>

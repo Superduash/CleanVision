@@ -2,17 +2,8 @@
   CleanVision design tokens — "Clinical Precision" design system
   ────────────────────────────────────────────────────────────────
   Light mode: "Laboratory White"
-    Clean, precise, clinical. Off-white base (not blinding pure white),
-    sky-blue primary evoking trust and medicine, deep violet accent for
-    AI/scan actions only. Highly readable, zero visual noise.
-
   Dark mode: "Monitor Glow"
-    Deep space-navy backgrounds evoking medical monitor displays.
-    Electric accents that pop against the dark — not just inverted light mode.
-    Each value is independently tuned, not auto-generated.
-
-  All values: R G B triplets (no rgb() wrapper) so Tailwind can compose
-  alpha via `rgb(var(--x) / <alpha-value>)`.
+  All values: R G B triplets (no rgb() wrapper).
 */
 
 :root {
@@ -47,15 +38,12 @@
 
   /* ── Highlight: for hover backgrounds, selection ──────────────── */
   --color-highlight: 239 246 255;      /* #EFF6FF — very subtle blue tint */
-
-  /* ── Focus ring ───────────────────────────────────────────────── */
   --color-focus: 13 110 253;           /* matches primary */
 }
 
 /*
   Dark mode — "Monitor Glow"
   Deep navy/indigo blacks, electric accents, WCAG AA contrast throughout.
-  NOT an inversion — every value is hand-tuned for dark surfaces.
 */
 .dark {
   /* ── Neutrals ─────────────────────────────────────────────────── */
@@ -63,7 +51,7 @@
   --color-bg: 11 16 32;                /* #0B1020 — deep layered background */
   --color-surface: 18 25 43;           /* #12192B — surface card */
   --color-surface-raised: 22 30 51;    /* #161E33 — elevated surface */
-  --color-border: 31 41 61;            /* #1F293D — subtle border (approx rgba(255,255,255,.08)) */
+  --color-border: 31 41 61;            /* #1F293D — subtle border */
 
   /* ── Text ─────────────────────────────────────────────────────── */
   --color-text-primary: 228 235 255;   /* #E4EBFF — crisp blue-white */
@@ -89,7 +77,5 @@
 
   /* ── Highlight ────────────────────────────────────────────────── */
   --color-highlight: 13 19 36;         /* same as surface in dark */
-
-  /* ── Focus ring ───────────────────────────────────────────────── */
   --color-focus: 59 130 246;
 }

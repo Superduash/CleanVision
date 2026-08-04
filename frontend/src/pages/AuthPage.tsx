@@ -309,7 +309,7 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
               className={cn(
                 "flex-1 rounded-lg py-2.5 text-center text-sm font-semibold transition-all",
                 isLogin
-                  ? "bg-primary text-white shadow-primary-glow"
+                  ? "bg-primary text-white"
                   : "text-text-muted hover:text-text-primary"
               )}
             >

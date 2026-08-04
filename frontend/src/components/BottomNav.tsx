@@ -63,7 +63,7 @@ export function BottomNav() {
               {primary ? (
                 <span
                   className={cn(
-                    "grid h-10 w-10 place-items-center rounded-full shadow-primary-glow transition-all",
+                    "grid h-10 w-10 place-items-center rounded-full transition-all",
                     isActive ? "bg-primary text-white" : "bg-accent text-white"
                   )}
                 >

@@ -8,9 +8,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { to: "/#features", label: "Features" },
-  { to: "/#how-it-works", label: "How it works" },
-  { to: "/#faq", label: "FAQ" },
+  { to: "/features", label: "Features" },
+  { to: "/docs", label: "Docs" },
+  { to: "/api", label: "API" },
+  { to: "/contact", label: "Contact" },
 ];
 
 export function PublicNavbar() {
@@ -62,13 +63,13 @@ export function PublicNavbar() {
           {/* Desktop nav (Centered) */}
           <nav className="hidden flex-1 items-center justify-center gap-2 lg:flex" aria-label="Site navigation">
             {NAV_LINKS.map((link) => (
-              <a
+              <Link
                 key={link.to}
-                href={link.to}
+                to={link.to}
                 className="rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition-colors hover:bg-surface-raised hover:text-text-primary"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -146,14 +147,14 @@ export function PublicNavbar() {
         </div>
         <nav className="flex flex-col gap-2 p-6 overflow-y-auto">
           {NAV_LINKS.map((link) => (
-            <a
+            <Link
               key={link.to}
-              href={link.to}
+              to={link.to}
               onClick={() => setIsOpen(false)}
               className="rounded-xl px-4 py-3 text-base font-medium text-text-muted hover:bg-bg hover:text-text-primary transition-colors"
             >
               {link.label}
-            </a>
+            </Link>
           ))}
           
           <div className="mt-6 flex flex-col gap-3 pt-6 border-t border-border">

@@ -76,14 +76,7 @@ export interface ReportsSummary {
   }>;
 }
 
-/** Legacy alias for the summary used on the dashboard */
-export interface SummaryReport {
-  total_rooms: number;
-  clean_count: number;
-  needs_attention_count: number;
-  dirty_count: number;
-  average_score: number;
-}
+
 
 export class ApiError extends Error {
   status: number;
@@ -228,7 +221,7 @@ export const api = {
   deleteScan: (scanId: number) =>
     request<void>(`/api/scans/${scanId}`, { method: "DELETE" }),
 
-  getSummary: () => request<SummaryReport>("/api/reports/summary"),
+  getSummary: () => request<ReportsSummary>("/api/reports/summary"),
 
   getReports: (days = 7) =>
     request<ReportsSummary>(`/api/reports/summary?days=${days}`),
