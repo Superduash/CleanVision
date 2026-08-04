@@ -138,14 +138,14 @@ export function LandingPage() {
                 becomes an incident report.
               </p>
 
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-                <Link to="/signup">
-                  <Button size="lg" className="h-14 px-8 text-base">
-                    Get Started <ArrowRight className="ml-1 h-5 w-5" />
+              <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link to="/signup" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto">
+                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                 </Link>
-                <a href="#how-it-works">
-                  <Button variant="secondary" size="lg" className="h-14 px-8 text-base">
+                <a href="#how-it-works" className="w-full sm:w-auto">
+                  <Button variant="secondary" size="lg" className="w-full sm:w-auto">
                     See how it works
                   </Button>
                 </a>
@@ -237,14 +237,14 @@ export function LandingPage() {
             <p className="mx-auto mt-6 max-w-xl text-lg text-bg/80">
               Deploy CleanVision in minutes. Stop guessing and start validating with AI-powered analytics.
             </p>
-            <div className="mt-10 flex justify-center gap-4">
-              <Link to="/signup">
-                <Button size="lg" className="bg-bg text-ink hover:bg-bg/90 active:bg-bg border-transparent hover:shadow-none">
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link to="/signup" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto bg-white text-ink hover:bg-white/90 active:bg-white border-transparent shadow-none">
                   Create Free Account
                 </Button>
               </Link>
-              <Link to="/login">
-                <Button size="lg" variant="ghost" className="h-14 px-8 text-base text-bg hover:bg-bg/10">
+              <Link to="/login" className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10 active:bg-white/20">
                   Log in
                 </Button>
               </Link>
