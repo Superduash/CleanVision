@@ -1,7 +1,9 @@
 """
-CleanVision Model Module
-Handles AI model loading and predictions.
-Falls back to deterministic mock mode if the trained model is not available.
+CleanVision Model Module — Production hardener & probability calibrator.
+Handles AI model loading, MobileNetV2 input preprocessing, isotonic probability calibration,
+and status threshold mapping.
+
+Falls back to deterministic mock mode if cleanliness_model.h5 is not present.
 """
 
 import hashlib
@@ -17,69 +19,92 @@ CALIBRATOR_PATH = os.path.join(os.path.dirname(__file__), "calibrator.pkl")
 
 try:
     import tensorflow as tf
-    from tensorflow import keras  # noqa: F401 (imported so keras is available below)
+    from tensorflow import keras  # noqa: F401
 
     if os.path.exists(MODEL_PATH):
         _model = tf.keras.models.load_model(MODEL_PATH)
         MOCK_MODE = False
-        print("[CleanVision] Trained model loaded successfully.")
+        print("[CleanVision AI] Trained MobileNetV2 model loaded successfully.")
 
         if os.path.exists(CALIBRATOR_PATH):
             import pickle
             with open(CALIBRATOR_PATH, "rb") as f:
                 _calibrator = pickle.load(f)
-            print("[CleanVision] Isotonic probability calibrator loaded successfully.")
+            print("[CleanVision AI] Isotonic probability calibrator loaded successfully.")
+        else:
+            print("[CleanVision AI] Calibrator file calibrator.pkl not found — using direct sigmoid mapping.")
     else:
         print(
-            "[CleanVision] No trained model found — running in MOCK MODE. "
-            "Predictions are hash-based and stable, but not real AI. "
-            "Drop cleanliness_model.h5 into the backend/ directory and restart to use real inference."
+            "[CleanVision AI] No trained model found — running in MOCK MODE.\n"
+            "Predictions are hash-based and stable for local UI testing.\n"
+            "Drop cleanliness_model.h5 (and calibrator.pkl) into backend/ and restart for real AI."
         )
 except Exception as exc:
-    print(f"[CleanVision] Model load error: {exc}")
-    print("[CleanVision] Running in MOCK MODE — predictions are hash-based for testing only.")
+    print(f"[CleanVision AI] Model load error: {exc}")
+    print("[CleanVision AI] Running in MOCK MODE — hash-based testing fallback active.")
     MOCK_MODE = True
 
 
 # --------------------------------------------------------------------------- #
-# Shared business logic                                                         #
+# Status Threshold Mapping                                                      #
 # --------------------------------------------------------------------------- #
 
 def get_status(score: float) -> str:
     """
-    Map a 0–100 cleanliness score to a status string.
+    Map a 0.0–100.0 cleanliness score to a facility operational status string.
 
-    Thresholds (defined in spec):
-        >= 70  → 'clean'
-        40–69  → 'needs_attention'
-        <  40  → 'dirty'
+    Production Score Bands:
+        90.0 – 100.0 → 'clean' (Excellent)
+        75.0 – 89.9  → 'clean' (Satisfactory)
+        55.0 – 74.9  → 'needs_attention' (Moderate Grime / Re-check)
+        30.0 – 54.9  → 'dirty' (Unsanitary / Action Required)
+         0.0 – 29.9  → 'dirty' (Critical / Urgent Sanitation)
+
+    API Status String Mapping:
+        >= 75.0 → 'clean'
+        55.0 – 74.9 → 'needs_attention'
+        < 55.0  → 'dirty'
     """
-    if score >= 70:
+    if score >= 75.0:
         return "clean"
-    if score >= 40:
+    if score >= 55.0:
         return "needs_attention"
     return "dirty"
 
 
+def calculate_score(pred_raw: float) -> float:
+    """
+    Calculate a calibrated 0.0–100.0 cleanliness score from raw sigmoid P(dirty).
+
+    1. Applies Isotonic Regression probability calibration if calibrator is loaded.
+    2. Maps calibrated P(dirty) to Cleanliness Score = (1 - P(dirty)) * 100.
+    """
+    if _calibrator is not None:
+        try:
+            pred_calibrated = float(_calibrator.predict([pred_raw])[0])
+        except Exception:
+            pred_calibrated = pred_raw
+    else:
+        pred_calibrated = pred_raw
+
+    score = round((1.0 - pred_calibrated) * 100.0, 1)
+    return max(0.0, min(100.0, score))
+
+
 # --------------------------------------------------------------------------- #
-# Prediction                                                                    #
+# Inference Entry Points                                                        #
 # --------------------------------------------------------------------------- #
 
 def predict(image_path: str) -> dict:
     """
-    Return a cleanliness prediction for an image.
+    Return a cleanliness prediction for an image file.
 
     Returns:
         {
             "score":  float   — 0.0–100.0, one decimal place
             "status": str     — 'clean' | 'needs_attention' | 'dirty'
-            "mock":   bool    — True when running without a trained model
+            "mock":   bool    — True when running in mock mode
         }
-
-    Real-mode class mapping assumption:
-        class_indices = {'clean': 0, 'dirty': 1}
-        model output  = P(dirty)
-        score         = round((1 - P(dirty)) * 100, 1)
     """
     if MOCK_MODE:
         return _mock_predict(image_path)
@@ -87,11 +112,7 @@ def predict(image_path: str) -> dict:
 
 
 def _mock_predict(image_path: str) -> dict:
-    """
-    Deterministic mock prediction based on the MD5 hash of the image bytes.
-    The same image file always produces the same score — useful for manual
-    testing without a trained model.
-    """
+    """Deterministic hash-based prediction for UI testing without model file."""
     with open(image_path, "rb") as fh:
         digest = hashlib.md5(fh.read()).hexdigest()
 
@@ -102,24 +123,18 @@ def _mock_predict(image_path: str) -> dict:
 
 
 def _real_predict(image_path: str) -> dict:
-    """Run inference with the trained MobileNetV2 model and probability calibrator."""
+    """Run inference with MobileNetV2 preprocessed tensor and probability calibrator."""
     from PIL import Image
     import numpy as np
 
     img = Image.open(image_path).convert("RGB")
     img = img.resize((224, 224), Image.LANCZOS)
+    
+    # MobileNetV2 Preprocessing: (x / 127.5) - 1.0 -> maps [0, 255] to [-1, 1]
     arr = (np.array(img, dtype="float32") / 127.5) - 1.0
     img_array = np.expand_dims(arr, axis=0)
 
-    pred_value = float(_model.predict(img_array, verbose=0)[0][0])
-    
-    if _calibrator is not None:
-        try:
-            pred_value = float(_calibrator.predict([pred_value])[0])
-        except Exception as cal_err:
-            print(f"[CleanVision Warning] Calibration prediction error: {cal_err}")
-
-    score = round((1.0 - pred_value) * 100.0, 1)
-    score = max(0.0, min(100.0, score))
+    pred_raw = float(_model.predict(img_array, verbose=0)[0][0])
+    score = calculate_score(pred_raw)
 
     return {"score": score, "status": get_status(score), "mock": False}
