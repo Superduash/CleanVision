@@ -10,8 +10,10 @@ import os
 # Global flags and model reference
 MOCK_MODE: bool = True
 _model = None
+_calibrator = None
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "cleanliness_model.h5")
+CALIBRATOR_PATH = os.path.join(os.path.dirname(__file__), "calibrator.pkl")
 
 try:
     import tensorflow as tf
@@ -21,6 +23,12 @@ try:
         _model = tf.keras.models.load_model(MODEL_PATH)
         MOCK_MODE = False
         print("[CleanVision] Trained model loaded successfully.")
+
+        if os.path.exists(CALIBRATOR_PATH):
+            import pickle
+            with open(CALIBRATOR_PATH, "rb") as f:
+                _calibrator = pickle.load(f)
+            print("[CleanVision] Isotonic probability calibrator loaded successfully.")
     else:
         print(
             "[CleanVision] No trained model found — running in MOCK MODE. "
@@ -72,10 +80,6 @@ def predict(image_path: str) -> dict:
         class_indices = {'clean': 0, 'dirty': 1}
         model output  = P(dirty)
         score         = round((1 - P(dirty)) * 100, 1)
-
-    IMPORTANT: Verify this against the class_indices printed during Colab
-    training.  If your notebook prints {'dirty': 0, 'clean': 1}, change
-    the formula to: score = round(pred_value * 100, 1)
     """
     if MOCK_MODE:
         return _mock_predict(image_path)
@@ -91,25 +95,30 @@ def _mock_predict(image_path: str) -> dict:
     with open(image_path, "rb") as fh:
         digest = hashlib.md5(fh.read()).hexdigest()
 
-    # Use the first 8 hex chars as an integer base for the score (0–99).
-    # Divide by 10 to get one decimal place while keeping the range 0–99.
     raw = int(digest[:8], 16)
-    # Map to 0.0–99.9 with one decimal
     score = round((raw % 1000) / 10.0, 1)
 
     return {"score": score, "status": get_status(score), "mock": True}
 
 
 def _real_predict(image_path: str) -> dict:
-    """Run inference with the trained MobileNetV2 model."""
+    """Run inference with the trained MobileNetV2 model and probability calibrator."""
     from PIL import Image
     import numpy as np
 
     img = Image.open(image_path).convert("RGB")
     img = img.resize((224, 224), Image.LANCZOS)
-    img_array = np.expand_dims(np.array(img, dtype="float32") / 255.0, axis=0)
+    arr = (np.array(img, dtype="float32") / 127.5) - 1.0
+    img_array = np.expand_dims(arr, axis=0)
 
     pred_value = float(_model.predict(img_array, verbose=0)[0][0])
+    
+    if _calibrator is not None:
+        try:
+            pred_value = float(_calibrator.predict([pred_value])[0])
+        except Exception as cal_err:
+            print(f"[CleanVision Warning] Calibration prediction error: {cal_err}")
+
     score = round((1.0 - pred_value) * 100.0, 1)
     score = max(0.0, min(100.0, score))
 
