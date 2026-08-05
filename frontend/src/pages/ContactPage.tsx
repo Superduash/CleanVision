@@ -2,6 +2,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/Button";
 
+const supportEmail = import.meta.env.VITE_SUPPORT_EMAIL || "support@cleanvision.com";
+const salesEmail = import.meta.env.VITE_SALES_EMAIL || "sales@cleanvision.com";
+
 export function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
 
@@ -40,11 +43,11 @@ export function ContactPage() {
         <div className="flex flex-col justify-center gap-8">
           <div>
             <h3 className="font-bold text-text-primary">Email Support</h3>
-            <p className="mt-1 text-sm text-text-muted">support@cleanvision.com</p>
+            <p className="mt-1 text-sm text-text-muted">{supportEmail}</p>
           </div>
           <div>
             <h3 className="font-bold text-text-primary">Sales Enquiries</h3>
-            <p className="mt-1 text-sm text-text-muted">sales@cleanvision.com</p>
+            <p className="mt-1 text-sm text-text-muted">{salesEmail}</p>
           </div>
           <div>
             <h3 className="font-bold text-text-primary">Office Hours</h3>

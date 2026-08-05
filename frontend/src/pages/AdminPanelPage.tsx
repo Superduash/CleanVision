@@ -5,38 +5,38 @@ import {
   ShieldCheck,
   LayoutGrid,
   Activity,
-  Database,
   ScanLine,
   Trash2,
   Edit2,
   Plus,
   UserPlus,
-  Crown,
-  UserX,
+  Users,
   CheckCircle2,
   Loader2,
   ClipboardList,
   Search,
+  Settings,
+  QrCode,
+  Printer,
+  X,
 } from "lucide-react";
-import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
-import { useQuery as useFireQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, Room } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { getAllAdmins, grantAdmin, revokeAdmin, type AdminRecord } from "@/lib/adminService";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
+import { createManager, createInspector, listStaff } from "@/lib/adminService";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 
-// ── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: "rooms",   label: "Rooms",       icon: LayoutGrid },
-  { id: "access",  label: "Access",      icon: ShieldCheck },
-  { id: "system",  label: "System",      icon: Activity },
+  { id: "rooms font-medium", label: "Rooms & QR Codes", icon: QrCode },
+  { id: "staff", label: "Staff Provisioning", icon: Users },
+  { id: "settings", label: "Hospital Config", icon: Settings },
+  { id: "system", label: "System Health", icon: Activity },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+type TabId = "rooms" | "staff" | "settings" | "system";
 
-// ── Confirm Modal ─────────────────────────────────────────────────────────────
 function SmallConfirm({
   message,
   onConfirm,
@@ -71,15 +71,60 @@ function SmallConfirm({
   );
 }
 
+// ── Print QR Code Modal ───────────────────────────────────────────────────────
+function QRPrintModal({ room, onClose }: { room: Room; onClose: () => void }) {
+  const { config } = useHospitalConfig();
+  const roomCode = room.roomCode || `${config.hospitalCode}-${room.block.replace(/\s+/g, '')}-${room.name.replace(/\D/g, '') || '101'}-A`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(
+    window.location.origin + "/report/" + roomCode
+  )}`;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-border bg-surface p-6 shadow-raised space-y-4 print:border-none print:shadow-none">
+        <button onClick={onClose} className="absolute right-4 top-4 text-text-disabled hover:text-text-muted print:hidden">
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="text-center space-y-1">
+          <h3 className="font-bold text-lg text-text-primary">{config.hospitalName}</h3>
+          <p className="text-xs text-text-muted">Scan QR code to report cleanliness issues</p>
+        </div>
+
+        <div className="flex flex-col items-center justify-center border border-border rounded-xl p-6 bg-white shadow-inner">
+          <img src={qrUrl} alt={`QR Code for ${room.name}`} className="h-44 w-44" />
+          <p className="mt-3 font-mono font-bold text-sm text-black">{roomCode}</p>
+          <p className="text-xs font-semibold text-black/70">{room.name} · {room.block}</p>
+        </div>
+
+        <div className="flex gap-2 print:hidden">
+          <Button variant="secondary" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button className="flex-1 gap-1.5" onClick={handlePrint}>
+            <Printer className="h-4 w-4" /> Print QR
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Rooms Tab ─────────────────────────────────────────────────────────────────
 function RoomsTab() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | number | null>(null);
+  const [qrRoom, setQrRoom] = useState<Room | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["rooms"],
-    queryFn: api.listRooms,
+    queryFn: () => api.listRooms(),
     select: (d) => d.rooms,
   });
 
@@ -88,7 +133,7 @@ function RoomsTab() {
   );
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.deleteRoom(id),
+    mutationFn: (id: string | number) => api.deleteRoom(id),
     onSuccess: () => {
       toast.success("Room deleted.");
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
@@ -99,7 +144,6 @@ function RoomsTab() {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-disabled" />
@@ -117,7 +161,6 @@ function RoomsTab() {
         </Link>
       </div>
 
-      {/* Table */}
       <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -125,26 +168,23 @@ function RoomsTab() {
               <tr className="border-b border-border bg-bg text-left">
                 <th className="px-5 py-3 font-semibold text-text-muted">Room</th>
                 <th className="px-5 py-3 font-semibold text-text-muted">Block</th>
+                <th className="px-5 py-3 font-semibold text-text-muted">QR Code</th>
                 <th className="px-5 py-3 font-semibold text-text-muted">Status</th>
-                <th className="px-5 py-3 font-semibold text-text-muted">Score</th>
-                <th className="px-5 py-3 font-semibold text-text-muted">Last Scanned</th>
                 <th className="px-5 py-3 font-semibold text-text-muted text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {isLoading && Array.from({ length: 5 }).map((_, i) => (
+              {isLoading && Array.from({ length: 4 }).map((_, i) => (
                 <tr key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
-                    <td key={j} className="px-5 py-3">
-                      <div className="h-5 skeleton rounded" />
-                    </td>
+                  {Array.from({ length: 5 }).map((_, j) => (
+                    <td key={j} className="px-5 py-3"><div className="h-5 skeleton rounded" /></td>
                   ))}
                 </tr>
               ))}
               {!isLoading && rooms.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-sm text-text-muted">
-                    {search ? "No rooms match your search." : "No rooms yet. Add one to get started."}
+                  <td colSpan={5} className="py-16 text-center text-sm text-text-muted">
+                    No rooms found.
                   </td>
                 </tr>
               )}
@@ -155,38 +195,26 @@ function RoomsTab() {
                       {room.name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-text-muted">{room.block ?? "—"}</td>
+                  <td className="px-5 py-3 text-text-muted">{room.block}</td>
+                  <td className="px-5 py-3 font-mono text-xs text-primary font-semibold">
+                    {room.roomCode || `${room.block.replace(/\s+/g, '')}-${room.name.replace(/\D/g, '') || '101'}-A`}
+                  </td>
                   <td className="px-5 py-3">
                     {room.latest_status ? <StatusBadge status={room.latest_status} /> : (
                       <span className="text-xs text-text-disabled">Not scanned</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    {room.latest_score != null ? (
-                      <span className={cn(
-                        "font-mono font-bold text-base",
-                        room.latest_status === "clean" ? "text-success" :
-                        room.latest_status === "needs_attention" ? "text-warning" : "text-danger"
-                      )}>
-                        {Math.round(room.latest_score)}
-                      </span>
-                    ) : <span className="text-text-disabled">—</span>}
-                  </td>
-                  <td className="px-5 py-3 text-text-muted text-xs">
-                    {room.last_scanned
-                      ? formatDistanceToNow(new Date(room.last_scanned), { addSuffix: true })
-                      : "Never"}
-                  </td>
-                  <td className="px-5 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => setQrRoom(room)}
+                        className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                      >
+                        <QrCode className="h-3.5 w-3.5" /> Print QR
+                      </button>
                       <Link to={`/dashboard/rooms/${room.id}/edit`}>
                         <button className="rounded-lg p-1.5 text-text-disabled hover:bg-highlight hover:text-primary transition-colors" title="Edit">
                           <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                      </Link>
-                      <Link to={`/dashboard/scan?room=${room.id}`}>
-                        <button className="rounded-lg p-1.5 text-text-disabled hover:bg-highlight hover:text-accent transition-colors" title="Scan">
-                          <ScanLine className="h-3.5 w-3.5" />
                         </button>
                       </Link>
                       <button
@@ -207,128 +235,311 @@ function RoomsTab() {
 
       {deletingId !== null && (
         <SmallConfirm
-          message={`Delete "${rooms.find(r => r.id === deletingId)?.name ?? "this room"}"? All scans will also be deleted.`}
+          message="Delete room? All associated scans will also be deleted."
           onConfirm={() => deleteMutation.mutate(deletingId)}
           onCancel={() => setDeletingId(null)}
           isLoading={deleteMutation.isPending}
         />
       )}
+
+      {qrRoom && <QRPrintModal room={qrRoom} onClose={() => setQrRoom(null)} />}
     </div>
   );
 }
 
-// ── Access Tab ────────────────────────────────────────────────────────────────
-function AccessTab() {
+// ── Staff Provisioning Tab ────────────────────────────────────────────────────
+function StaffTab() {
   const { session } = useAuth();
-  const [newEmail, setNewEmail] = useState("");
+  const { config } = useHospitalConfig();
+
+  const [roleToCreate, setRoleToCreate] = useState<"manager" | "inspector">("manager");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
+
   const queryClient = useQueryClient();
 
-  const { data: admins = [], isLoading } = useFireQuery({
-    queryKey: ["admin-list"],
-    queryFn: getAllAdmins,
+  const { data: staff = [], isLoading } = useQuery({
+    queryKey: ["staff"],
+    queryFn: listStaff,
   });
 
-  const grantMutation = useMutation({
-    mutationFn: (email: string) => grantAdmin(email, session?.email ?? "admin"),
+  const createManagerMutation = useMutation({
+    mutationFn: () => createManager({ email, password, name }),
     onSuccess: () => {
-      toast.success(`Admin access granted.`);
-      setNewEmail("");
-      queryClient.invalidateQueries({ queryKey: ["admin-list"] });
+      toast.success("Manager account created.");
+      setEmail(""); setPassword(""); setName("");
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
     },
-    onError: (err: Error) => toast.error(err.message || "Failed to grant admin."),
+    onError: (err: Error) => toast.error(err.message || "Failed to create manager."),
   });
 
-  const revokeMutation = useMutation({
-    mutationFn: (email: string) => revokeAdmin(email),
+  const createInspectorMutation = useMutation({
+    mutationFn: () => createInspector({ email, password, name, assignedBlocks: selectedBlocks }),
     onSuccess: () => {
-      toast.success("Admin access revoked.");
-      queryClient.invalidateQueries({ queryKey: ["admin-list"] });
+      toast.success("Inspector account created.");
+      setEmail(""); setPassword(""); setName(""); setSelectedBlocks([]);
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
     },
-    onError: (err: Error) => toast.error(err.message || "Failed to revoke admin."),
+    onError: (err: Error) => toast.error(err.message || "Failed to create inspector."),
   });
+
+  const toggleBlock = (block: string) => {
+    setSelectedBlocks((prev) =>
+      prev.includes(block) ? prev.filter((b) => b !== block) : [...prev, block]
+    );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      toast.error("Email and password are required");
+      return;
+    }
+    if (roleToCreate === "manager") {
+      createManagerMutation.mutate();
+    } else {
+      createInspectorMutation.mutate();
+    }
+  };
 
   return (
-    <div className="space-y-5">
-      {/* Grant form */}
+    <div className="grid gap-6 md:grid-cols-2">
       <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
         <h3 className="font-semibold text-text-primary flex items-center gap-2">
-          <UserPlus className="h-4 w-4 text-primary" /> Grant Admin Access
+          <UserPlus className="h-4 w-4 text-primary" /> Provision Staff Account
         </h3>
-        <p className="mt-1 text-sm text-text-muted">
-          The user must already have a CleanVision account. They'll get admin role on next sign-in.
+        <p className="mt-1 text-xs text-text-muted">
+          Server-side role custom claims assignment.
         </p>
-        <div className="mt-3 flex gap-2">
-          <input
-            className="h-10 flex-1 rounded-xl border border-border bg-bg px-3 text-sm text-text-primary outline-none focus:border-primary focus:shadow-focus"
-            placeholder="user@hospital.com"
-            type="email"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && newEmail && grantMutation.mutate(newEmail)}
-          />
-          <Button
-            size="sm"
-            onClick={() => newEmail && grantMutation.mutate(newEmail)}
-            isLoading={grantMutation.isPending}
-            disabled={!newEmail}
-          >
-            Grant
-          </Button>
-        </div>
-      </div>
 
-      {/* Admin list */}
-      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
-        <div className="border-b border-border px-5 py-3">
-          <h3 className="font-semibold text-text-primary">Current Admins</h3>
-        </div>
-        <div className="divide-y divide-border">
-          {isLoading && Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-5 py-4">
-              <div className="h-8 w-8 skeleton rounded-full" />
-              <div className="flex-1 space-y-1.5">
-                <div className="h-4 w-40 skeleton rounded" />
-                <div className="h-3 w-24 skeleton rounded" />
-              </div>
-            </div>
-          ))}
-          {admins.map((admin: AdminRecord) => (
-            <div key={admin.email} className="flex items-center gap-3 px-5 py-4 hover:bg-highlight transition-colors">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
-                {admin.email[0].toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-text-primary truncate">{admin.email}</p>
-                  {admin.isSuperAdmin && (
-                    <span className="flex items-center gap-1 rounded-full bg-warning-bg px-2 py-0.5 text-xs font-semibold text-warning">
-                      <Crown className="h-3 w-3" /> Super Admin
-                    </span>
-                  )}
-                </div>
-                {admin.grantedAt ? (
-                  <p className="text-xs text-text-disabled">
-                    Granted {format(admin.grantedAt, "dd MMM yyyy")}
-                    {admin.grantedBy && ` by ${admin.grantedBy}`}
-                  </p>
-                ) : (
-                  <p className="text-xs text-text-disabled">System admin</p>
-                )}
-              </div>
-              {!admin.isSuperAdmin && (
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Role</label>
+            <div className="mt-2 flex gap-3">
+              {session?.role === "admin" && (
                 <button
-                  onClick={() => revokeMutation.mutate(admin.email)}
-                  disabled={revokeMutation.isPending}
-                  className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-text-muted hover:bg-danger-bg hover:text-danger transition-colors disabled:opacity-50"
-                  title="Revoke admin"
+                  type="button"
+                  onClick={() => setRoleToCreate("manager")}
+                  className={cn(
+                    "flex-1 rounded-xl border p-2.5 text-xs font-bold transition-all",
+                    roleToCreate === "manager" ? "border-primary bg-primary/10 text-primary" : "border-border text-text-muted"
+                  )}
                 >
-                  <UserX className="h-3.5 w-3.5" /> Revoke
+                  Manager
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setRoleToCreate("inspector")}
+                className={cn(
+                  "flex-1 rounded-xl border p-2.5 text-xs font-bold transition-all",
+                  roleToCreate === "inspector" ? "border-primary bg-primary/10 text-primary" : "border-border text-text-muted"
+                )}
+              >
+                Inspector
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Full Name</label>
+            <input
+              type="text"
+              className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+              placeholder="Sarah Connor"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Email Address</label>
+            <input
+              type="email"
+              required
+              className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+              placeholder="sarah@hospital.org"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Password</label>
+            <input
+              type="password"
+              required
+              className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {roleToCreate === "inspector" && (
+            <div>
+              <label className="block text-xs font-semibold uppercase text-text-muted mb-1.5">
+                Assigned Blocks
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {config.blocks.map((b) => (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => toggleBlock(b)}
+                    className={cn(
+                      "rounded-lg border px-3 py-1 text-xs font-semibold transition-all",
+                      selectedBlocks.includes(b)
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-bg text-text-muted hover:border-text-disabled"
+                    )}
+                  >
+                    {b}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full mt-2"
+            isLoading={createManagerMutation.isPending || createInspectorMutation.isPending}
+          >
+            Create {roleToCreate === "manager" ? "Manager" : "Inspector"} Account
+          </Button>
+        </form>
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card flex flex-col">
+        <div className="border-b border-border px-5 py-3">
+          <h3 className="font-semibold text-text-primary">Staff Roster</h3>
+        </div>
+        <div className="divide-y divide-border overflow-y-auto max-h-[440px]">
+          {isLoading && Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-4"><div className="h-4 skeleton rounded w-1/2" /></div>
+          ))}
+          {!isLoading && staff.length === 0 && (
+            <div className="py-12 text-center text-xs text-text-muted">
+              No staff members registered.
+            </div>
+          )}
+          {staff.map((member) => (
+            <div key={member.uid} className="flex items-center justify-between p-4 hover:bg-highlight transition-colors">
+              <div>
+                <p className="font-medium text-text-primary text-sm">{member.name || member.email}</p>
+                <p className="text-xs text-text-disabled">{member.email}</p>
+                {member.assignedBlocks && member.assignedBlocks.length > 0 && (
+                  <div className="mt-1 flex gap-1">
+                    {member.assignedBlocks.map((b) => (
+                      <span key={b} className="rounded bg-bg px-1.5 py-0.5 text-[10px] text-text-muted border border-border">
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary capitalize">
+                {member.role}
+              </span>
             </div>
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Hospital Config Settings Tab ─────────────────────────────────────────────
+function SettingsTab() {
+  const { config, updateConfig, isUpdating } = useHospitalConfig();
+
+  const [name, setName] = useState(config.hospitalName);
+  const [code, setCode] = useState(config.hospitalCode);
+  const [email, setEmail] = useState(config.supportEmail);
+  const [blocksStr, setBlocksStr] = useState(config.blocks.join(", "));
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const blocks = blocksStr.split(",").map((b) => b.trim()).filter(Boolean);
+    try {
+      await updateConfig({
+        hospitalName: name,
+        hospitalCode: code,
+        supportEmail: email,
+        blocks,
+      });
+      toast.success("Hospital configuration updated!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save configuration.");
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-surface p-6 shadow-card max-w-2xl space-y-6">
+      <div>
+        <h3 className="font-semibold text-text-primary flex items-center gap-2">
+          <Settings className="h-5 w-5 text-primary" /> Hospital Singleton Configuration
+        </h3>
+        <p className="mt-1 text-xs text-text-muted">
+          Manage facility settings without modifying application source code.
+        </p>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-4">
+        <div>
+          <label className="block text-xs font-semibold uppercase text-text-muted">Hospital Name</label>
+          <input
+            type="text"
+            required
+            className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Hospital Code</label>
+            <input
+              type="text"
+              required
+              className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm font-mono text-text-primary outline-none focus:border-primary"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+            />
+            <p className="mt-1 text-[11px] text-text-disabled">Used as prefix in room QR codes (e.g. CGH-B-101-A)</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase text-text-muted">Support Email</label>
+            <input
+              type="email"
+              required
+              className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold uppercase text-text-muted">Facility Blocks (Comma Separated)</label>
+          <input
+            type="text"
+            required
+            className="mt-1 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary"
+            value={blocksStr}
+            onChange={(e) => setBlocksStr(e.target.value)}
+          />
+        </div>
+
+        <Button type="submit" isLoading={isUpdating} className="w-full">
+          Save Configuration Changes
+        </Button>
+      </form>
     </div>
   );
 }
@@ -337,7 +548,7 @@ function AccessTab() {
 function SystemTab() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["admin-stats"],
-    queryFn: api.getAdminStats,
+    queryFn: () => api.getAdminStats(),
     refetchInterval: 60_000,
   });
 
@@ -352,13 +563,12 @@ function SystemTab() {
   const statCards = [
     { label: "Total Rooms",          value: stats?.total_rooms,          icon: LayoutGrid,   color: "text-primary" },
     { label: "Total Scans",          value: stats?.total_scans,          icon: ScanLine,     color: "text-accent"  },
-    { label: "Pending Requests",     value: stats?.pending_requests,     icon: ClipboardList, color: "text-warning" },
+    { label: "Open Issue Alerts",    value: stats?.open_issues,          icon: ClipboardList, color: "text-warning" },
     { label: "Unread Notifications", value: stats?.unread_notifications, icon: Activity,     color: "text-danger"  },
   ];
 
   return (
     <div className="space-y-5">
-      {/* Status + model */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
           <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wide">Backend Status</h3>
@@ -377,7 +587,7 @@ function SystemTab() {
             ) : stats.mock_mode ? (
               <>
                 <span className="dot-pulse bg-warning" />
-                <span className="font-semibold text-warning">Mock Mode (no model file)</span>
+                <span className="font-semibold text-warning">Mock Mode Active</span>
               </>
             ) : (
               <>
@@ -389,7 +599,6 @@ function SystemTab() {
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {statCards.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="rounded-xl border border-border bg-surface p-5 shadow-card">
@@ -401,51 +610,32 @@ function SystemTab() {
           </div>
         ))}
       </div>
-
-      {/* Database info */}
-      <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
-        <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-text-muted" />
-          <h3 className="font-semibold text-text-primary">Database</h3>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-text-muted">Rooms</span>
-            <span className="font-mono font-semibold text-text-primary">{stats?.total_rooms ?? "—"}</span>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-text-muted">Scans</span>
-            <span className="font-mono font-semibold text-text-primary">{stats?.total_scans ?? "—"}</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Main Admin / Manager Operations Page ──────────────────────────────────────
 export function AdminPanelPage() {
   const [tab, setTab] = useState<TabId>("rooms");
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8 page-enter">
-      <div className="mb-6">
+    <div className="mx-auto max-w-5xl px-6 py-8 page-enter space-y-6">
+      <div>
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <ShieldCheck className="h-6 w-6 text-primary" /> Admin Panel
+          <ShieldCheck className="h-6 w-6 text-primary" /> Facility Management & Operations
         </h1>
         <p className="mt-1 text-sm text-text-muted">
-          Manage rooms, user access, and monitor system health.
+          Manage rooms, generate QR codes, provision staff, and update hospital settings.
         </p>
       </div>
 
-      {/* Tab nav */}
-      <div className="mb-6 flex gap-1 rounded-xl border border-border bg-surface p-1 w-fit shadow-card">
+      <div className="flex gap-1 rounded-xl border border-border bg-surface p-1 w-fit shadow-card overflow-x-auto">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setTab(id)}
+            onClick={() => setTab(id as TabId)}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all",
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all whitespace-nowrap",
               tab === id
                 ? "bg-primary text-white shadow-sm"
                 : "text-text-muted hover:text-text-primary"
@@ -456,9 +646,10 @@ export function AdminPanelPage() {
         ))}
       </div>
 
-      {tab === "rooms"  && <RoomsTab />}
-      {tab === "access" && <AccessTab />}
-      {tab === "system" && <SystemTab />}
+      {tab === "rooms"    && <RoomsTab />}
+      {tab === "staff"    && <StaffTab />}
+      {tab === "settings" && <SettingsTab />}
+      {tab === "system"   && <SystemTab />}
     </div>
   );
 }

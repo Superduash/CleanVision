@@ -1,493 +1,525 @@
 """
-CleanVision Database Module
-SQLite database for rooms and scans management.
+CleanVision Database Module — Single-Hospital Architecture
+Firestore-backed data access layer for Hospital Config, Public Room Lookup,
+Public Issue Reporting, Rooms, Scans, and Staff Roster.
 """
 
-import sqlite3
-import os
-from contextlib import contextmanager
+import time
+import uuid
+from datetime import datetime
+import firebase_config
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'database.db')
+# Local fallback store if Firestore credentials are missing in local dev
+_in_memory_store = {
+    "hospitalConfig": {
+        "main": {
+            "hospitalName": "City General Hospital",
+            "hospitalCode": "CGH",
+            "blocks": ["Block A", "Block B", "Block C", "Block D"],
+            "supportEmail": "support@cleanvision.com",
+            "logoUrl": None,
+            "updatedAt": datetime.utcnow().isoformat(),
+        }
+    },
+    "roomLookup": {},
+    "users": {},
+    "rooms": {},
+    "scans": {},
+    "issueReports": {},
+    "notifications": {}
+}
 
-
-@contextmanager
-def get_connection():
-    """Context manager for database connections with proper cleanup."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
-
+def _get_db():
+    return firebase_config.get_db()
 
 def init_db():
-    """Creates tables if they don't exist, enables foreign keys."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS rooms (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                block TEXT,
-                baseline_image_path TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS scans (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                room_id INTEGER NOT NULL,
-                image_path TEXT,
-                cleanliness_score REAL,
-                status TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(room_id) REFERENCES rooms(id)
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS cleaning_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                room_id INTEGER NOT NULL,
-                requested_by_name TEXT,
-                requested_by_email TEXT,
-                reason TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                resolved_at TIMESTAMP,
-                FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE CASCADE
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS notifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type TEXT NOT NULL,
-                title TEXT NOT NULL,
-                message TEXT,
-                room_id INTEGER,
-                is_read INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(room_id) REFERENCES rooms(id) ON DELETE SET NULL
-            )
-        ''')
+    """Firestore initialization."""
+    db = _get_db()
+    if db:
+        print("[CleanVision Database] Firestore connected (Single-Hospital Mode).")
+    else:
+        print("[CleanVision Database] Firestore client unavailable — using in-memory store.")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Hospital Config (Singleton: hospitalConfig/main)
+# ─────────────────────────────────────────────────────────────────────────────
 
-def add_room(name, block):
-    """Inserts a new room and returns its id."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO rooms (name, block) VALUES (?, ?)',
-            (name, block)
-        )
-        return cursor.lastrowid
+def get_hospital_config() -> dict:
+    db = _get_db()
+    if db:
+        doc = db.collection("hospitalConfig").document("main").get()
+        if doc.exists:
+            return doc.to_dict()
+    return _in_memory_store["hospitalConfig"]["main"]
 
+def update_hospital_config(config_data: dict, updated_by: str = "admin") -> dict:
+    db = _get_db()
+    config_data["updatedAt"] = datetime.utcnow().isoformat()
+    config_data["updatedBy"] = updated_by
 
-def set_baseline(room_id, image_path):
-    """Sets the baseline image path for a room."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'UPDATE rooms SET baseline_image_path = ? WHERE id = ?',
-            (image_path, room_id)
-        )
+    if db:
+        db.collection("hospitalConfig").document("main").set(config_data, merge=True)
+    else:
+        _in_memory_store["hospitalConfig"]["main"].update(config_data)
 
+    return get_hospital_config()
 
-def get_all_rooms():
-    """
-    Returns all rooms with latest_score, latest_status, last_scanned
-    pulled via LEFT JOIN against the most recent scan per room.
-    Rooms with no scans show null for these fields.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT 
-                r.id,
-                r.name,
-                r.block,
-                r.baseline_image_path,
-                r.created_at,
-                latest.score AS latest_score,
-                latest.status AS latest_status,
-                latest.timestamp AS last_scanned
-            FROM rooms r
-            LEFT JOIN (
-                SELECT 
-                    s1.room_id,
-                    s1.cleanliness_score AS score,
-                    s1.status,
-                    s1.timestamp
-                FROM scans s1
-                INNER JOIN (
-                    SELECT room_id, MAX(timestamp) AS max_ts
-                    FROM scans
-                    GROUP BY room_id
-                ) s2 ON s1.room_id = s2.room_id AND s1.timestamp = s2.max_ts
-            ) latest ON r.id = latest.room_id
-            ORDER BY r.created_at DESC
-        ''')
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
+# ─────────────────────────────────────────────────────────────────────────────
+# Rooms & Public Room Lookup (roomLookup/{roomCode})
+# ─────────────────────────────────────────────────────────────────────────────
 
+def add_room(name: str, block: str, floor: str = "Floor 1", room_number: str = None, created_by: str = None) -> tuple:
+    db = _get_db()
+    room_id = str(uuid.uuid4())
+    config = get_hospital_config()
+    code_prefix = config.get("hospitalCode", "CGH")
+    
+    clean_block = block.replace(" ", "")
+    num = room_number or "".join([c for c in name if c.isdigit()]) or "101"
+    room_code = f"{code_prefix}-{clean_block}-{num}-A"
 
-def get_room(room_id):
-    """Returns a single room by id, or None if not found."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM rooms WHERE id = ?', (room_id,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-
-
-def add_scan(room_id, image_path, score, status):
-    """Inserts a new scan and returns its id."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO scans (room_id, image_path, cleanliness_score, status) VALUES (?, ?, ?, ?)',
-            (room_id, image_path, score, status)
-        )
-        return cursor.lastrowid
-
-
-def get_scan_history(room_id, limit=10):
-    """Returns the most recent scans for a room, most recent first."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            '''SELECT id, room_id, image_path, cleanliness_score, status, timestamp 
-               FROM scans 
-               WHERE room_id = ? 
-               ORDER BY timestamp DESC 
-               LIMIT ?''',
-            (room_id, limit)
-        )
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-
-
-def get_scan(scan_id):
-    """Returns a single scan by id, or None if not found."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM scans WHERE id = ?', (scan_id,))
-        row = cursor.fetchone()
-        if row:
-            return dict(row)
-        return None
-
-
-def delete_scan(scan_id):
-    """Deletes a single scan record. Returns True if deleted, False if not found."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM scans WHERE id = ?', (scan_id,))
-        return cursor.rowcount > 0
-
-
-def delete_room(room_id):
-    """
-    Deletes a room and all its associated scans (manual cascade).
-    Returns the list of image paths that should be cleaned up from disk.
-    Returns None if the room was not found.
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-
-        # Check room exists
-        cursor.execute('SELECT id FROM rooms WHERE id = ?', (room_id,))
-        if not cursor.fetchone():
-            return None
-
-        # Collect all image paths for file cleanup
-        image_paths = []
-
-        # Room baseline image
-        cursor.execute('SELECT baseline_image_path FROM rooms WHERE id = ?', (room_id,))
-        row = cursor.fetchone()
-        if row and row['baseline_image_path']:
-            image_paths.append(row['baseline_image_path'])
-
-        # Scan images
-        cursor.execute('SELECT image_path FROM scans WHERE room_id = ?', (room_id,))
-        for scan_row in cursor.fetchall():
-            if scan_row['image_path']:
-                image_paths.append(scan_row['image_path'])
-
-        # Delete scans first (foreign key)
-        cursor.execute('DELETE FROM scans WHERE room_id = ?', (room_id,))
-
-        # Delete the room
-        cursor.execute('DELETE FROM rooms WHERE id = ?', (room_id,))
-
-        return image_paths
-
-
-def update_room(room_id, name, block):
-    """Updates a room's name and block. Returns True if updated, False if not found."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'UPDATE rooms SET name = ?, block = ? WHERE id = ?',
-            (name, block, room_id)
-        )
-        return cursor.rowcount > 0
-
-
-# ── Cleaning Requests ──────────────────────────────────────────────────────────
-
-def create_cleaning_request(room_id, requested_by_name, requested_by_email, reason=''):
-    """Creates a new cleaning request and returns its id."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            '''INSERT INTO cleaning_requests
-               (room_id, requested_by_name, requested_by_email, reason)
-               VALUES (?, ?, ?, ?)''',
-            (room_id, requested_by_name, requested_by_email, reason)
-        )
-        return cursor.lastrowid
-
-
-def get_cleaning_requests(status_filter=None):
-    """Returns all cleaning requests, optionally filtered by status."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        if status_filter:
-            cursor.execute(
-                '''SELECT cr.*, r.name as room_name, r.block as room_block
-                   FROM cleaning_requests cr
-                   JOIN rooms r ON cr.room_id = r.id
-                   WHERE cr.status = ?
-                   ORDER BY cr.created_at DESC''',
-                (status_filter,)
-            )
-        else:
-            cursor.execute(
-                '''SELECT cr.*, r.name as room_name, r.block as room_block
-                   FROM cleaning_requests cr
-                   JOIN rooms r ON cr.room_id = r.id
-                   ORDER BY cr.created_at DESC'''
-            )
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def get_room_cleaning_requests(room_id):
-    """Returns cleaning requests for a specific room."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            '''SELECT * FROM cleaning_requests
-               WHERE room_id = ?
-               ORDER BY created_at DESC''',
-            (room_id,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def update_cleaning_request_status(request_id, new_status):
-    """Updates a cleaning request status. Returns True if updated."""
-    from datetime import datetime
-    resolved_at = datetime.utcnow().isoformat() if new_status in ('completed', 'dismissed') else None
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'UPDATE cleaning_requests SET status = ?, resolved_at = ? WHERE id = ?',
-            (new_status, resolved_at, request_id)
-        )
-        return cursor.rowcount > 0
-
-
-def get_pending_request_count():
-    """Returns count of pending cleaning requests."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) as cnt FROM cleaning_requests WHERE status = 'pending'")
-        return cursor.fetchone()['cnt']
-
-
-# ── Notifications ──────────────────────────────────────────────────────────────
-
-def create_notification(type_, title, message='', room_id=None):
-    """Creates a new notification and returns its id."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'INSERT INTO notifications (type, title, message, room_id) VALUES (?, ?, ?, ?)',
-            (type_, title, message, room_id)
-        )
-        return cursor.lastrowid
-
-
-def get_notifications(limit=50):
-    """Returns notifications, most recent first."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?',
-            (limit,)
-        )
-        return [dict(row) for row in cursor.fetchall()]
-
-
-def mark_notification_read(notification_id):
-    """Marks a single notification as read."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            'UPDATE notifications SET is_read = 1 WHERE id = ?',
-            (notification_id,)
-        )
-        return cursor.rowcount > 0
-
-
-def mark_all_notifications_read():
-    """Marks all notifications as read."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('UPDATE notifications SET is_read = 1')
-
-
-def delete_notification(notification_id):
-    """Deletes a notification."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('DELETE FROM notifications WHERE id = ?', (notification_id,))
-        return cursor.rowcount > 0
-
-
-def get_unread_notification_count():
-    """Returns count of unread notifications."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0')
-        return cursor.fetchone()['cnt']
-
-
-def get_system_stats():
-    """Returns aggregate system statistics for the admin panel."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT COUNT(*) as cnt FROM rooms')
-        total_rooms = cursor.fetchone()['cnt']
-        cursor.execute('SELECT COUNT(*) as cnt FROM scans')
-        total_scans = cursor.fetchone()['cnt']
-        cursor.execute("SELECT COUNT(*) as cnt FROM cleaning_requests WHERE status = 'pending'")
-        pending_requests = cursor.fetchone()['cnt']
-        cursor.execute("SELECT COUNT(*) as cnt FROM notifications WHERE is_read = 0")
-        unread_notifications = cursor.fetchone()['cnt']
-    return {
-        'total_rooms': total_rooms,
-        'total_scans': total_scans,
-        'pending_requests': pending_requests,
-        'unread_notifications': unread_notifications,
+    room_data = {
+        "id": room_id,
+        "name": name,
+        "block": block,
+        "floor": floor,
+        "roomNumber": num,
+        "roomCode": room_code,
+        "baselineImagePath": None,
+        "createdAt": datetime.utcnow().isoformat(),
+        "createdBy": created_by,
     }
 
+    lookup_data = {
+        "roomCode": room_code,
+        "roomId": room_id,
+        "block": block,
+        "floor": floor,
+        "roomNumber": num,
+        "hospitalName": config.get("hospitalName", "City General Hospital"),
+    }
 
-def get_reports_summary(days=7):
-    """
-    Aggregate cleanliness stats for the Reports screen.
-    Returns today_count, avg_score_today, status_counts (most recent scan per room),
-    daily_trend (continuous x-axis), and block_breakdown.
-    """
-    from datetime import datetime, timedelta
+    if db:
+        db.collection("rooms").document(room_id).set(room_data)
+        db.collection("roomLookup").document(room_code).set(lookup_data)
+    else:
+        _in_memory_store["rooms"][room_id] = room_data
+        _in_memory_store["roomLookup"][room_code] = lookup_data
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
+    return room_id, room_code
 
-        # today_count + avg_score_today
-        cursor.execute("""
-            SELECT COUNT(*) as cnt,
-                   COALESCE(ROUND(AVG(cleanliness_score), 1), 0) as avg
-            FROM scans
-            WHERE date(timestamp) = date('now')
-        """)
-        today = cursor.fetchone()
-        today_count = today["cnt"]
-        avg_score_today = today["avg"]
+def get_room_lookup(room_code: str) -> dict:
+    db = _get_db()
+    if db:
+        doc = db.collection("roomLookup").document(room_code).get()
+        if doc.exists:
+            return doc.to_dict()
+    return _in_memory_store["roomLookup"].get(room_code)
 
-        # status_counts — most recent scan per room only
-        cursor.execute("""
-            SELECT
-                SUM(CASE WHEN s.status = 'clean' THEN 1 ELSE 0 END) as clean,
-                SUM(CASE WHEN s.status = 'needs_attention' THEN 1 ELSE 0 END) as needs_attention,
-                SUM(CASE WHEN s.status = 'dirty' THEN 1 ELSE 0 END) as dirty
-            FROM scans s
-            INNER JOIN (
-                SELECT room_id, MAX(timestamp) as max_ts
-                FROM scans GROUP BY room_id
-            ) latest ON s.room_id = latest.room_id AND s.timestamp = latest.max_ts
-        """)
-        sc = cursor.fetchone()
-        status_counts = {
-            "clean": sc["clean"] or 0,
-            "needs_attention": sc["needs_attention"] or 0,
-            "dirty": sc["dirty"] or 0,
-        }
+def set_baseline(room_id: str, image_path: str):
+    db = _get_db()
+    r_id = str(room_id)
+    if db:
+        db.collection("rooms").document(r_id).update({"baselineImagePath": image_path})
+    else:
+        if r_id in _in_memory_store["rooms"]:
+            _in_memory_store["rooms"][r_id]["baselineImagePath"] = image_path
 
-        # daily_trend — continuous, fill missing days with 0
-        today_date = datetime.now().date()
-        trend_dates = [
-            (today_date - timedelta(days=i)).isoformat()
-            for i in range(days - 1, -1, -1)
-        ]
+def get_all_rooms(block_filter: str = None) -> list:
+    db = _get_db()
+    rooms_list = []
 
-        cursor.execute("""
-            SELECT date(timestamp) as d,
-                   ROUND(AVG(cleanliness_score), 1) as avg_score,
-                   COUNT(*) as scan_count
-            FROM scans
-            WHERE date(timestamp) >= date('now', ?)
-            GROUP BY date(timestamp)
-            ORDER BY date(timestamp) ASC
-        """, (f"-{days} days",))
-        trend_rows = {
-            row["d"]: {"avg_score": row["avg_score"], "scan_count": row["scan_count"]}
-            for row in cursor.fetchall()
-        }
-        daily_trend = [
-            {
-                "date": d,
-                "avg_score": trend_rows.get(d, {}).get("avg_score", 0),
-                "scan_count": trend_rows.get(d, {}).get("scan_count", 0),
-            }
-            for d in trend_dates
-        ]
+    if db:
+        query = db.collection("rooms")
+        if block_filter:
+            query = query.where("block", "==", block_filter)
+        room_docs = [d.to_dict() for d in query.stream()]
 
-        # block_breakdown — each room's latest scan, grouped by block
-        cursor.execute("""
-            SELECT
-                r.block,
-                COUNT(DISTINCT r.id) as room_count,
-                ROUND(AVG(s.cleanliness_score), 1) as avg_score,
-                SUM(CASE WHEN s.status IN ('needs_attention', 'dirty')
-                    THEN 1 ELSE 0 END) as attention_count
-            FROM rooms r
-            LEFT JOIN (
-                SELECT s1.room_id, s1.cleanliness_score, s1.status
-                FROM scans s1
-                INNER JOIN (
-                    SELECT room_id, MAX(timestamp) as max_ts
-                    FROM scans GROUP BY room_id
-                ) s2 ON s1.room_id = s2.room_id AND s1.timestamp = s2.max_ts
-            ) s ON r.id = s.room_id
-            GROUP BY r.block
-            ORDER BY r.block ASC
-        """)
-        block_breakdown = [dict(row) for row in cursor.fetchall()]
+        for room in room_docs:
+            r_id = room.get("id")
+            scans_query = db.collection("scans").where("roomId", "==", r_id).order_by("timestamp", direction="DESCENDING").limit(1).stream()
+            scans = [s.to_dict() for s in scans_query]
+            if scans:
+                latest = scans[0]
+                room["latest_score"] = latest.get("cleanlinessScore")
+                room["latest_status"] = latest.get("status")
+                room["last_scanned"] = latest.get("timestamp")
+            else:
+                room["latest_score"] = None
+                room["latest_status"] = None
+                room["last_scanned"] = None
+            rooms_list.append(room)
+    else:
+        rooms = list(_in_memory_store["rooms"].values())
+        if block_filter:
+            rooms = [r for r in rooms if r.get("block") == block_filter]
+
+        for room in rooms:
+            r_id = room.get("id")
+            r_scans = [s for s in _in_memory_store["scans"].values() if s.get("roomId") == r_id]
+            r_scans.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            if r_scans:
+                latest = r_scans[0]
+                room["latest_score"] = latest.get("cleanlinessScore")
+                room["latest_status"] = latest.get("status")
+                room["last_scanned"] = latest.get("timestamp")
+            else:
+                room["latest_score"] = None
+                room["latest_status"] = None
+                room["last_scanned"] = None
+            rooms_list.append(room)
+
+    return rooms_list
+
+def get_room(room_id: str) -> dict:
+    db = _get_db()
+    r_id = str(room_id)
+    if db:
+        doc = db.collection("rooms").document(r_id).get()
+        return doc.to_dict() if doc.exists else None
+    return _in_memory_store["rooms"].get(r_id)
+
+def update_room(room_id: str, name: str, block: str, floor: str = None, room_number: str = None) -> bool:
+    db = _get_db()
+    r_id = str(room_id)
+    if db:
+        ref = db.collection("rooms").document(r_id)
+        if not ref.get().exists:
+            return False
+        update_data = {"name": name, "block": block}
+        if floor: update_data["floor"] = floor
+        if room_number: update_data["roomNumber"] = room_number
+        ref.update(update_data)
+        return True
+    else:
+        if r_id in _in_memory_store["rooms"]:
+            _in_memory_store["rooms"][r_id]["name"] = name
+            _in_memory_store["rooms"][r_id]["block"] = block
+            if floor: _in_memory_store["rooms"][r_id]["floor"] = floor
+            if room_number: _in_memory_store["rooms"][r_id]["roomNumber"] = room_number
+            return True
+        return False
+
+def delete_room(room_id: str) -> list:
+    db = _get_db()
+    r_id = str(room_id)
+    image_paths = []
+
+    room = get_room(r_id)
+    if not room:
+        return None
+
+    if room.get("baselineImagePath"):
+        image_paths.append(room["baselineImagePath"])
+
+    if db:
+        scans = db.collection("scans").where("roomId", "==", r_id).stream()
+        for s in scans:
+            s_dict = s.to_dict()
+            if s_dict.get("imagePath"):
+                image_paths.append(s_dict["imagePath"])
+            db.collection("scans").document(s.id).delete()
+
+        db.collection("rooms").document(r_id).delete()
+        if room.get("roomCode"):
+            db.collection("roomLookup").document(room["roomCode"]).delete()
+    else:
+        _in_memory_store["rooms"].pop(r_id, None)
+        if room.get("roomCode"):
+            _in_memory_store["roomLookup"].pop(room["roomCode"], None)
+        scan_ids = [sid for sid, s in _in_memory_store["scans"].items() if s.get("roomId") == r_id]
+        for sid in scan_ids:
+            s = _in_memory_store["scans"].pop(sid)
+            if s.get("imagePath"):
+                image_paths.append(s["imagePath"])
+
+    return image_paths
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Scans
+# ─────────────────────────────────────────────────────────────────────────────
+
+def add_scan(room_id: str, image_path: str, score: float, status: str, scanned_by: str = None) -> str:
+    db = _get_db()
+    scan_id = str(uuid.uuid4())
+    scan_data = {
+        "id": scan_id,
+        "roomId": str(room_id),
+        "imagePath": image_path,
+        "cleanlinessScore": score,
+        "status": status,
+        "scannedBy": scanned_by,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    if db:
+        db.collection("scans").document(scan_id).set(scan_data)
+    else:
+        _in_memory_store["scans"][scan_id] = scan_data
+    return scan_id
+
+def get_scan_history(room_id: str, limit: int = 20) -> list:
+    db = _get_db()
+    r_id = str(room_id)
+    if db:
+        query = db.collection("scans").where("roomId", "==", r_id).order_by("timestamp", direction="DESCENDING").limit(limit)
+        return [doc.to_dict() for doc in query.stream()]
+    else:
+        scans = [s for s in _in_memory_store["scans"].values() if s.get("roomId") == r_id]
+        scans.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return scans[:limit]
+
+def get_scan(scan_id: str) -> dict:
+    db = _get_db()
+    s_id = str(scan_id)
+    if db:
+        doc = db.collection("scans").document(s_id).get()
+        return doc.to_dict() if doc.exists else None
+    return _in_memory_store["scans"].get(s_id)
+
+def delete_scan(scan_id: str) -> bool:
+    db = _get_db()
+    s_id = str(scan_id)
+    if db:
+        ref = db.collection("scans").document(s_id)
+        if not ref.get().exists:
+            return False
+        ref.delete()
+        return True
+    else:
+        return _in_memory_store["scans"].pop(s_id, None) is not None
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public Issue Reports (issueReports/{reportId})
+# ─────────────────────────────────────────────────────────────────────────────
+
+def create_issue_report(room_code: str, issue_type: str, comment: str = None, photo_url: str = None) -> str:
+    db = _get_db()
+    report_id = str(uuid.uuid4())
+
+    lookup = get_room_lookup(room_code)
+    room_id = lookup.get("roomId") if lookup else "unknown-room"
+    block = lookup.get("block") if lookup else "Block B"
+
+    report_data = {
+        "id": report_id,
+        "roomCode": room_code,
+        "roomId": room_id,
+        "block": block,
+        "issueType": issue_type,
+        "comment": comment,
+        "photoUrl": photo_url,
+        "status": "open",
+        "createdAt": datetime.utcnow().isoformat(),
+        "resolvedBy": None,
+        "resolvedAt": None,
+    }
+
+    if db:
+        db.collection("issueReports").document(report_id).set(report_data)
+    else:
+        _in_memory_store["issueReports"][report_id] = report_data
+
+    return report_id
+
+def get_issue_reports(status_filter: str = None, block_filter: str = None) -> list:
+    db = _get_db()
+    reports_list = []
+
+    if db:
+        query = db.collection("issueReports")
+        if status_filter:
+            query = query.where("status", "==", status_filter)
+        if block_filter:
+            query = query.where("block", "==", block_filter)
+
+        raw = [doc.to_dict() for doc in query.stream()]
+        for r in raw:
+            room = get_room(r.get("roomId"))
+            if room:
+                r["roomName"] = room.get("name")
+            reports_list.append(r)
+    else:
+        raw = list(_in_memory_store["issueReports"].values())
+        if status_filter:
+            raw = [r for r in raw if r.get("status") == status_filter]
+        if block_filter:
+            raw = [r for r in raw if r.get("block") == block_filter]
+
+        for r in raw:
+            room = get_room(r.get("roomId"))
+            if room:
+                r["roomName"] = room.get("name")
+            reports_list.append(r)
+
+    reports_list.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+    return reports_list
+
+def update_issue_report_status(report_id: str, new_status: str, resolved_by: str = None) -> bool:
+    db = _get_db()
+    rep_id = str(report_id)
+    resolved_at = datetime.utcnow().isoformat() if new_status == "resolved" else None
+
+    if db:
+        ref = db.collection("issueReports").document(rep_id)
+        if not ref.get().exists:
+            return False
+        ref.update({
+            "status": new_status,
+            "resolvedBy": resolved_by,
+            "resolvedAt": resolved_at,
+        })
+        return True
+    else:
+        if rep_id in _in_memory_store["issueReports"]:
+            _in_memory_store["issueReports"][rep_id]["status"] = new_status
+            _in_memory_store["issueReports"][rep_id]["resolvedBy"] = resolved_by
+            _in_memory_store["issueReports"][rep_id]["resolvedAt"] = resolved_at
+            return True
+        return False
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Notifications & Staff
+# ─────────────────────────────────────────────────────────────────────────────
+
+def create_notification(type_: str, title: str, message: str = "", room_id: str = None) -> str:
+    db = _get_db()
+    n_id = str(uuid.uuid4())
+    n_data = {
+        "id": n_id,
+        "type": type_,
+        "title": title,
+        "message": message,
+        "roomId": str(room_id) if room_id else None,
+        "is_read": False,
+        "createdAt": datetime.utcnow().isoformat(),
+    }
+    if db:
+        db.collection("notifications").document(n_id).set(n_data)
+    else:
+        _in_memory_store["notifications"][n_id] = n_data
+    return n_id
+
+def get_notifications(limit: int = 50) -> list:
+    db = _get_db()
+    if db:
+        query = db.collection("notifications").order_by("createdAt", direction="DESCENDING").limit(limit)
+        return [doc.to_dict() for doc in query.stream()]
+    else:
+        items = list(_in_memory_store["notifications"].values())
+        items.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+        return items[:limit]
+
+def mark_notification_read(notification_id: str) -> bool:
+    db = _get_db()
+    n_id = str(notification_id)
+    if db:
+        ref = db.collection("notifications").document(n_id)
+        if not ref.get().exists:
+            return False
+        ref.update({"is_read": True})
+        return True
+    else:
+        if n_id in _in_memory_store["notifications"]:
+            _in_memory_store["notifications"][n_id]["is_read"] = True
+            return True
+        return False
+
+def mark_all_notifications_read():
+    db = _get_db()
+    if db:
+        for doc in db.collection("notifications").where("is_read", "==", False).stream():
+            doc.reference.update({"is_read": True})
+    else:
+        for n in _in_memory_store["notifications"].values():
+            n["is_read"] = True
+
+def delete_notification(notification_id: str) -> bool:
+    db = _get_db()
+    n_id = str(notification_id)
+    if db:
+        ref = db.collection("notifications").document(n_id)
+        if not ref.get().exists:
+            return False
+        ref.delete()
+        return True
+    else:
+        return _in_memory_store["notifications"].pop(n_id, None) is not None
+
+def get_unread_notification_count() -> int:
+    notes = get_notifications(limit=200)
+    return len([n for n in notes if not n.get("is_read")])
+
+def get_staff_users() -> list:
+    db = _get_db()
+    if db:
+        return [doc.to_dict() for doc in db.collection("users").stream()]
+    return list(_in_memory_store["users"].values())
+
+def get_system_stats() -> dict:
+    rooms = get_all_rooms()
+    open_issues = len(get_issue_reports(status_filter="open"))
+    unreads = get_unread_notification_count()
+
+    db = _get_db()
+    scans_count = len(list(db.collection("scans").stream())) if db else len(_in_memory_store["scans"])
 
     return {
-        "today_count": today_count,
-        "avg_score_today": avg_score_today,
-        "status_counts": status_counts,
+        "total_rooms": len(rooms),
+        "total_scans": scans_count,
+        "pending_requests": open_issues,
+        "open_issues": open_issues,
+        "unread_notifications": unreads,
+    }
+
+def get_reports_summary(days: int = 7) -> dict:
+    rooms = get_all_rooms()
+
+    clean_cnt = len([r for r in rooms if r.get("latest_status") == "clean"])
+    needs_att_cnt = len([r for r in rooms if r.get("latest_status") == "needs_attention"])
+    dirty_cnt = len([r for r in rooms if r.get("latest_status") == "dirty"])
+
+    scores = [r["latest_score"] for r in rooms if r.get("latest_score") is not None]
+    avg_today = round(sum(scores) / len(scores), 1) if scores else 0.0
+
+    blocks = {}
+    for r in rooms:
+        b = r.get("block", "Default")
+        if b not in blocks:
+            blocks[b] = {"block": b, "room_count": 0, "scores": [], "attention_count": 0}
+        blocks[b]["room_count"] += 1
+        if r.get("latest_score") is not None:
+            blocks[b]["scores"].append(r["latest_score"])
+        if r.get("latest_status") in ("needs_attention", "dirty"):
+            blocks[b]["attention_count"] += 1
+
+    block_breakdown = []
+    for b_name, b_info in blocks.items():
+        avg = round(sum(b_info["scores"]) / len(b_info["scores"]), 1) if b_info["scores"] else 0.0
+        block_breakdown.append({
+            "block": b_name,
+            "room_count": b_info["room_count"],
+            "avg_score": avg,
+            "attention_count": b_info["attention_count"],
+        })
+
+    today_date = datetime.now().date()
+    daily_trend = [
+        {
+            "date": (today_date - timedelta(days=i)).isoformat(),
+            "avg_score": avg_today,
+            "scan_count": len(scores),
+        }
+        for i in range(days - 1, -1, -1)
+    ]
+
+    return {
+        "today_count": len(scores),
+        "avg_score_today": avg_today,
+        "status_counts": {
+            "clean": clean_cnt,
+            "needs_attention": needs_att_cnt,
+            "dirty": dirty_cnt,
+        },
         "daily_trend": daily_trend,
         "block_breakdown": block_breakdown,
     }

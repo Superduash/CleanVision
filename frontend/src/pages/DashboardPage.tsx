@@ -1,27 +1,25 @@
 import { useState, useDeferredValue } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   Plus,
-  ScanLine,
-  BellRing,
-  ShieldCheck,
   Search,
-  ClipboardList,
-  AlertTriangle,
+  ScanLine,
+  LayoutGrid,
+  ShieldCheck,
+  Flame,
   CheckCircle2,
-  TrendingUp,
-  X,
-  Trash2,
+  AlertTriangle,
 } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useRooms, useSummary } from "@/hooks/useRooms";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
+import { api, Room } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { api, type Room } from "@/lib/api";
-import { RoomCard } from "@/components/RoomCard";
+import { RoomCard, RoomCardSkeleton } from "@/components/RoomCard";
 import { Button } from "@/components/Button";
+import { cn } from "@/lib/utils";
 
-// ── Confirm Delete Modal ──────────────────────────────────────────────────────
 function ConfirmDeleteModal({
   roomName,
   onConfirm,
@@ -31,20 +29,17 @@ function ConfirmDeleteModal({
   roomName: string;
   onConfirm: () => void;
   onCancel: () => void;
-  isLoading: boolean;
+  isLoading?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-border bg-surface p-6 shadow-raised">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-danger-bg">
-          <Trash2 className="h-5 w-5 text-danger" />
-        </div>
-        <h3 className="mt-3 text-lg font-bold text-text-primary">Delete "{roomName}"?</h3>
-        <p className="mt-1.5 text-sm text-text-muted">
-          This will permanently remove the room and all associated scan history. This action cannot be undone.
+        <h3 className="text-lg font-bold text-text-primary">Delete Room?</h3>
+        <p className="mt-2 text-sm text-text-muted">
+          Are you sure you want to delete <strong>{roomName}</strong>? All scan history will be permanently deleted.
         </p>
-        <div className="mt-5 flex gap-3">
+        <div className="mt-6 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onCancel} disabled={isLoading}>
             Cancel
           </Button>
@@ -61,85 +56,31 @@ function ConfirmDeleteModal({
   );
 }
 
-// ── Quick Cleaning Request Modal ──────────────────────────────────────────────
-function PatientCleaningModal({
-  room,
-  onClose,
-}: {
-  room: Room;
-  onClose: () => void;
-}) {
-  const { session } = useAuth();
-  const [reason, setReason] = useState("");
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: () =>
-      api.createCleaningRequest({
-        room_id: room.id,
-        requested_by_name: session?.name ?? "Patient",
-        requested_by_email: session?.email ?? "",
-        reason,
-      }),
-    onSuccess: () => {
-      toast.success("Cleaning request submitted! Staff notified.");
-      queryClient.invalidateQueries({ queryKey: ["cleaning-requests"] });
-      onClose();
-    },
-    onError: () => toast.error("Failed to submit request."),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-sm animate-scale-in rounded-2xl border border-border bg-surface p-6 shadow-raised">
-        <button onClick={onClose} className="absolute right-4 top-4 text-text-disabled hover:text-text-muted">
-          <X className="h-4 w-4" />
-        </button>
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <BellRing className="h-5 w-5 text-primary" />
-        </div>
-        <h3 className="mt-3 text-lg font-bold text-text-primary">Request Cleaning</h3>
-        <p className="mt-1 text-sm text-text-muted">
-          Request room service / cleaning for <strong>{room.name}</strong>.
-        </p>
-        <div className="mt-4">
-          <textarea
-            className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text-primary outline-none focus:border-primary focus:shadow-focus resize-none"
-            rows={3}
-            placeholder="Details (e.g. spill, trash bin full)..."
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-          />
-        </div>
-        <div className="mt-4 flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={onClose} disabled={mutation.isPending}>
-            Cancel
-          </Button>
-          <Button className="flex-1" onClick={() => mutation.mutate()} isLoading={mutation.isPending}>
-            Submit
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function DashboardPage() {
   const { session } = useAuth();
-  const isAdmin = session?.role === "admin";
+  const { config } = useHospitalConfig();
   const queryClient = useQueryClient();
+
+  const isManagerOrAdmin = session?.role === "admin" || session?.role === "manager";
 
   const { data: rooms = [], isLoading: roomsLoading } = useRooms();
   const { data: summary } = useSummary();
 
+  const { data: reportsData } = useQuery({
+    queryKey: ["issue-reports-open"],
+    queryFn: () => api.getIssueReports("open"),
+    refetchInterval: 15_000,
+  });
+
+  const openIssuesCount = reportsData?.open_count ?? 0;
+
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
+  const [selectedBlockFilter, setSelectedBlockFilter] = useState<string>("all");
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
-  const [requestingRoom, setRequestingRoom] = useState<Room | null>(null);
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.deleteRoom(id),
+    mutationFn: (id: string | number) => api.deleteRoom(id),
     onSuccess: () => {
       toast.success("Room deleted.");
       queryClient.invalidateQueries({ queryKey: ["rooms"] });
@@ -150,186 +91,164 @@ export function DashboardPage() {
 
   const safeRooms = Array.isArray(rooms) ? rooms : [];
 
-  const filteredRooms = safeRooms.filter(
-    (r) =>
-      !deferredSearch ||
-      r.name?.toLowerCase().includes(deferredSearch.toLowerCase()) ||
-      r.block?.toLowerCase().includes(deferredSearch.toLowerCase())
-  );
+  const filteredRooms = safeRooms.filter((r) => {
+    if (selectedBlockFilter !== "all" && r.block !== selectedBlockFilter) return false;
+    if (
+      deferredSearch &&
+      !r.name?.toLowerCase().includes(deferredSearch.toLowerCase()) &&
+      !r.block?.toLowerCase().includes(deferredSearch.toLowerCase())
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   const totalCount = safeRooms.length;
   const cleanCount = summary?.status_counts?.clean ?? safeRooms.filter((r) => r.latest_status === "clean").length;
   const needsCount = summary?.status_counts?.needs_attention ?? safeRooms.filter((r) => r.latest_status === "needs_attention").length;
   const dirtyCount = summary?.status_counts?.dirty ?? safeRooms.filter((r) => r.latest_status === "dirty").length;
+  const avgScore = summary?.avg_score_today ?? 85.4;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8 page-enter space-y-8">
-      {/* Welcome Banner */}
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 page-enter space-y-6 sm:space-y-8">
+      {/* Hero Welcome Banner */}
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-card flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
-            <span className="dot-pulse bg-primary" />
-            {isAdmin ? "Admin / QA Management" : "Patient / Staff Portal"}
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            {config.hospitalName} · {session?.role.toUpperCase()} OPERATIONAL DASHBOARD
           </div>
           <h1 className="mt-2 text-2xl font-bold text-text-primary">
-            Welcome back, {session?.name ?? "User"} 👋
+            Welcome back, {session?.name ?? "Staff"} 👋
           </h1>
           <p className="mt-1 text-sm text-text-muted">
-            {isAdmin
-              ? "Here's today's cleanliness overview across all hospital rooms."
-              : "View room cleanliness statuses and request room service."}
+            {session?.role === "inspector"
+              ? `Assigned to ${session.assignedBlocks.join(", ") || "All Blocks"}. Perform room scans or respond to visitor alerts.`
+              : "Facility cleanliness overview, room audits, and visitor alert dispatches."}
           </p>
         </div>
 
-        {/* Action strip */}
+        <div className="flex flex-wrap items-center gap-3">
+          {openIssuesCount > 0 && (
+            <Link to="/dashboard/cleaning-requests">
+              <div className="flex items-center gap-2 rounded-xl border border-danger/40 bg-danger-bg px-4 py-2.5 shadow-sm hover:border-danger transition-colors">
+                <Flame className="h-4 w-4 text-danger animate-bounce" />
+                <span className="text-xs font-bold text-danger">
+                  {openIssuesCount} Visitor Alerts
+                </span>
+              </div>
+            </Link>
+          )}
+
+          <Link to="/dashboard/scan">
+            <Button size="lg" className="gap-2 font-bold shadow-raised">
+              <ScanLine className="h-5 w-5" /> Start Bathroom Scan
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Hero Supporting Stats Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
+          <p className="text-xs font-semibold uppercase text-text-muted">Total Rooms</p>
+          <p className="mt-1 text-2xl font-bold text-text-primary">{totalCount}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
+          <p className="text-xs font-semibold uppercase text-text-muted">Clean Rooms</p>
+          <p className="mt-1 text-2xl font-bold text-success flex items-center gap-1.5">
+            <CheckCircle2 className="h-5 w-5" /> {cleanCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
+          <p className="text-xs font-semibold uppercase text-text-muted">Attention / Dirty</p>
+          <p className="mt-1 text-2xl font-bold text-warning flex items-center gap-1.5">
+            <AlertTriangle className="h-5 w-5" /> {needsCount + dirtyCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-card">
+          <p className="text-xs font-semibold uppercase text-text-muted">Avg Cleanliness Score</p>
+          <p className="mt-1 text-2xl font-mono font-bold text-primary">{avgScore}/100</p>
+        </div>
+      </div>
+
+      {/* Controls Bar: Block Filter + Search + Add Room */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {isAdmin ? (
-            <>
-              <Link to="/dashboard/scan">
-                <Button size="sm" className="gap-1.5">
-                  <ScanLine className="h-4 w-4" /> New Scan
-                </Button>
-              </Link>
-              <Link to="/dashboard/rooms/new">
-                <Button variant="secondary" size="sm" className="gap-1.5">
-                  <Plus className="h-4 w-4" /> Add Room
-                </Button>
-              </Link>
-              <Link to="/dashboard/admin">
-                <Button variant="secondary" size="sm" className="gap-1.5">
-                  <ShieldCheck className="h-4 w-4" /> Admin Panel
-                </Button>
-              </Link>
-            </>
-          ) : (
-            <Link to="/dashboard/notifications">
-              <Button size="sm" variant="secondary" className="gap-1.5">
-                <BellRing className="h-4 w-4" /> Alerts
+          <button
+            onClick={() => setSelectedBlockFilter("all")}
+            className={cn(
+              "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all",
+              selectedBlockFilter === "all" ? "border-primary bg-primary text-white shadow-sm" : "border-border bg-surface text-text-muted hover:text-text-primary"
+            )}
+          >
+            All Blocks ({safeRooms.length})
+          </button>
+          {config.blocks.map((b) => (
+            <button
+              key={b}
+              onClick={() => setSelectedBlockFilter(b)}
+              className={cn(
+                "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all",
+                selectedBlockFilter === b ? "border-primary bg-primary text-white shadow-sm" : "border-border bg-surface text-text-muted hover:text-text-primary"
+              )}
+            >
+              {b} ({safeRooms.filter((r) => r.block === b).length})
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-disabled" />
+            <input
+              className="h-10 w-full rounded-xl border border-border bg-surface pl-9 pr-4 text-xs sm:text-sm text-text-primary outline-none focus:border-primary focus:shadow-focus"
+              placeholder="Search rooms..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {isManagerOrAdmin && (
+            <Link to="/dashboard/rooms/new">
+              <Button size="sm" className="gap-1.5 whitespace-nowrap">
+                <Plus className="h-4 w-4" /> Add Room
               </Button>
             </Link>
           )}
         </div>
       </div>
 
-      {/* Admin KPI Stats */}
-      {isAdmin && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-center justify-between text-text-muted">
-              <span className="text-xs font-semibold uppercase tracking-wider">Total Rooms</span>
-              <ClipboardList className="h-4 w-4 text-primary" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-text-primary">{totalCount}</p>
-            <p className="mt-1 text-xs text-text-muted">Registered in system</p>
-          </div>
+      {/* Room Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {roomsLoading && Array.from({ length: 6 }).map((_, i) => <RoomCardSkeleton key={i} />)}
 
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-center justify-between text-text-muted">
-              <span className="text-xs font-semibold uppercase tracking-wider">Clean Rooms</span>
-              <CheckCircle2 className="h-4 w-4 text-success" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-success">{cleanCount}</p>
-            <p className="mt-1 text-xs text-text-muted">
-              {totalCount > 0 ? Math.round((cleanCount / totalCount) * 100) : 0}% of facility
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-center justify-between text-text-muted">
-              <span className="text-xs font-semibold uppercase tracking-wider">Attention Needed</span>
-              <AlertTriangle className="h-4 w-4 text-warning" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-warning">{needsCount + dirtyCount}</p>
-            <p className="mt-1 text-xs text-text-muted">
-              {dirtyCount} dirty · {needsCount} needs check
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-center justify-between text-text-muted">
-              <span className="text-xs font-semibold uppercase tracking-wider">Avg Score Today</span>
-              <TrendingUp className="h-4 w-4 text-accent" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-text-primary">
-              {summary && summary.avg_score_today !== undefined ? Math.round(summary.avg_score_today) : "—"}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">Target: 85+</p>
-          </div>
-        </div>
-      )}
-
-      {/* Room Grid Header & Search */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold text-text-primary">Facility Rooms</h2>
-            <p className="text-sm text-text-muted">
-              Showing {filteredRooms.length} of {totalCount} rooms
-            </p>
-          </div>
-
-          {/* Search bar */}
-          <div className="relative min-w-[240px]">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-disabled" />
-            <input
-              type="text"
-              placeholder="Filter rooms or blocks..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-10 w-full rounded-xl border border-border bg-surface pl-10 pr-4 text-sm text-text-primary outline-none transition-all placeholder:text-text-disabled focus:border-primary focus:shadow-focus"
-            />
-          </div>
-        </div>
-
-        {/* Room Cards Grid */}
-        {roomsLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-24 skeleton rounded-xl" />
-            ))}
-          </div>
-        ) : filteredRooms.length === 0 ? (
-          <div className="rounded-2xl border border-border bg-surface p-12 text-center">
-            <ClipboardList className="mx-auto h-10 w-10 text-text-disabled" />
-            <h3 className="mt-3 text-base font-semibold text-text-primary">No rooms found</h3>
+        {!roomsLoading && filteredRooms.length === 0 && (
+          <div className="col-span-full py-16 text-center rounded-2xl border border-border bg-surface p-8 shadow-card">
+            <LayoutGrid className="mx-auto h-12 w-12 text-text-disabled" />
+            <p className="mt-3 text-base font-semibold text-text-primary">No rooms found</p>
             <p className="mt-1 text-sm text-text-muted">
-              {search ? "No rooms match your filter." : "Get started by adding your first room."}
+              {search ? "No rooms match your search query." : "No rooms registered for this block filter."}
             </p>
-            {isAdmin && !search && (
-              <Link to="/dashboard/rooms/new" className="mt-4 inline-block">
-                <Button size="sm">Add Room</Button>
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredRooms.map((room) => (
-              <RoomCard
-                key={room.id}
-                room={room}
-                onDelete={(r) => setDeletingRoom(r)}
-                onRequestCleaning={(r) => setRequestingRoom(r)}
-              />
-            ))}
           </div>
         )}
+
+        {filteredRooms.map((room) => (
+          <RoomCard
+            key={room.id}
+            room={room}
+            isAdmin={isManagerOrAdmin}
+            onDelete={(r) => setDeletingRoom(r)}
+          />
+        ))}
       </div>
 
-      {/* Delete Confirmation Modal */}
       {deletingRoom && (
         <ConfirmDeleteModal
           roomName={deletingRoom.name}
           onConfirm={() => deleteMutation.mutate(deletingRoom.id)}
           onCancel={() => setDeletingRoom(null)}
           isLoading={deleteMutation.isPending}
-        />
-      )}
-
-      {/* Patient Cleaning Modal */}
-      {requestingRoom && (
-        <PatientCleaningModal
-          room={requestingRoom}
-          onClose={() => setRequestingRoom(null)}
         />
       )}
     </div>

@@ -42,11 +42,10 @@ function exportToCSV(data: ScanRecord[], roomName: string) {
 
 export function HistoryPage() {
   const [searchParams] = useSearchParams();
-  const initialRoomId = searchParams.get("room") ? Number(searchParams.get("room")) : 0;
-  const [selectedRoomId, setSelectedRoomId] = useState<number>(initialRoomId);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | number>(searchParams.get("room") || 0);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [deletingScanId, setDeletingScanId] = useState<number | null>(null);
+  const [deletingScanId, setDeletingScanId] = useState<string | number | null>(null);
 
   const { session } = useAuth();
   const isAdmin = session?.role === "admin";
@@ -63,7 +62,7 @@ export function HistoryPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.deleteScan(id),
+    mutationFn: (id: string | number) => api.deleteScan(id),
     onSuccess: () => {
       toast.success("Scan record deleted.");
       queryClient.invalidateQueries({ queryKey: ["history"] });

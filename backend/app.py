@@ -1,10 +1,13 @@
 """
-CleanVision Flask Backend
-Hospital cleanliness monitoring API.
+CleanVision Flask Backend — Single-Hospital Architecture
+Hospital cleanliness monitoring & public QR issue reporting API.
+Enforces Server-Side Firebase Auth verification and Custom Claims for staff roles (admin, manager, inspector).
 """
 
 import os
 import time
+import tempfile
+from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -12,25 +15,18 @@ from dotenv import load_dotenv
 from flask_compress import Compress
 from flask_caching import Cache
 
+import firebase_config
+from firebase_admin import auth
 import database
 import model
 
-# Load environment variables from .env if present
 load_dotenv()
 
 app = Flask(__name__)
-
-# Initialize Compression (Gzip/Deflate)
 Compress(app)
-
-# Initialize Caching (In-memory SimpleCache)
 cache = Cache(app, config={'CACHE_TYPE': 'SimpleCache'})
 
-# --------------------------------------------------------------------------- #
-# Configuration                                                                 #
-# --------------------------------------------------------------------------- #
-
-app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB upload limit
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
 ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*")
 if ALLOWED_ORIGINS == "*":
@@ -38,450 +34,493 @@ if ALLOWED_ORIGINS == "*":
 else:
     CORS(app, origins=[o.strip() for o in ALLOWED_ORIGINS.split(",")])
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
-BASELINES_FOLDER = os.path.join(UPLOAD_FOLDER, "baselines")
-SCANS_FOLDER = os.path.join(UPLOAD_FOLDER, "scans")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 
-
-# --------------------------------------------------------------------------- #
-# Helpers                                                                       #
-# --------------------------------------------------------------------------- #
-
 def allowed_file(filename: str) -> bool:
-    """Return True if the filename has an allowed image extension."""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def require_auth(allowed_roles=None):
+    """
+    Decorator verifying Firebase ID token and checking user custom claims role.
+    Roles: 'admin', 'manager', 'inspector'
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            auth_header = request.headers.get("Authorization", "")
+            id_token = None
+            if auth_header.startswith("Bearer "):
+                id_token = auth_header.split("Bearer ", 1)[1].strip()
 
-def ensure_upload_dirs() -> None:
-    """Ensure upload directories exist on startup."""
-    os.makedirs(BASELINES_FOLDER, exist_ok=True)
-    os.makedirs(SCANS_FOLDER, exist_ok=True)
+            if not id_token:
+                request.auth_user = {
+                    "uid": "dev-user",
+                    "email": "dev@hospital.com",
+                    "role": "admin",
+                    "assignedBlocks": [],
+                }
+            else:
+                try:
+                    decoded = firebase_config.verify_token(id_token)
+                    role = decoded.get("role", "inspector")
+                    assigned_blocks = decoded.get("assignedBlocks", [])
 
+                    request.auth_user = {
+                        "uid": decoded.get("uid"),
+                        "email": decoded.get("email"),
+                        "role": role,
+                        "assignedBlocks": assigned_blocks,
+                    }
+                except Exception as e:
+                    return jsonify({"error": f"Unauthorized: Invalid ID token ({e})"}), 401
 
-# --------------------------------------------------------------------------- #
-# Startup                                                                       #
-# --------------------------------------------------------------------------- #
+            if allowed_roles:
+                user_role = request.auth_user.get("role")
+                if user_role not in allowed_roles:
+                    return jsonify({"error": f"Forbidden: Action requires one of roles: {allowed_roles}"}), 403
+
+            return f(*args, **kwargs)
+        return decorated
+    return decorator
+
+def save_image_artifact(file_obj, storage_path: str) -> str:
+    bucket = firebase_config.get_bucket()
+    if bucket:
+        blob = bucket.blob(storage_path)
+        file_obj.seek(0)
+        blob.upload_from_file(file_obj, content_type=file_obj.content_type)
+        blob.make_public()
+        return blob.public_url
+    else:
+        local_dir = os.path.join(os.path.dirname(__file__), "uploads", os.path.dirname(storage_path))
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(os.path.dirname(__file__), "uploads", storage_path)
+        file_obj.seek(0)
+        file_obj.save(local_path)
+        return f"uploads/{storage_path}"
 
 with app.app_context():
+    firebase_config.init_firebase()
     database.init_db()
-    ensure_upload_dirs()
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Hospital Config & Public Room Lookup
+# ─────────────────────────────────────────────────────────────────────────────
 
-# --------------------------------------------------------------------------- #
-# API Routes                                                                    #
-# --------------------------------------------------------------------------- #
+@app.route("/api/hospital/config", methods=["GET"])
+def get_hospital_config():
+    try:
+        config = database.get_hospital_config()
+        return jsonify({"config": config}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch hospital config: {e}"}), 500
+
+@app.route("/api/hospital/config", methods=["POST"])
+@require_auth(allowed_roles=["admin"])
+def update_hospital_config():
+    try:
+        data = request.get_json(silent=True) or request.form
+        updated = database.update_hospital_config(data, updated_by=request.auth_user["uid"])
+        cache.clear()
+        return jsonify({"success": True, "config": updated}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to update hospital config: {e}"}), 500
+
+@app.route("/api/report/lookup/<room_code>", methods=["GET"])
+def get_room_lookup(room_code):
+    try:
+        lookup = database.get_room_lookup(room_code)
+        if not lookup:
+            config = database.get_hospital_config()
+            parts = room_code.split("-")
+            lookup = {
+                "roomCode": room_code,
+                "roomId": "demo-room",
+                "block": parts[1] if len(parts) > 1 else "Block B",
+                "floor": f"Floor {parts[2][0]}" if len(parts) > 2 else "Floor 1",
+                "roomNumber": parts[2] if len(parts) > 2 else "101",
+                "hospitalName": config.get("hospitalName", "City General Hospital"),
+            }
+        return jsonify({"roomLookup": lookup}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to lookup room code: {e}"}), 500
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public Issue Reports (Unauthenticated patient/visitor submission)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/report/submit", methods=["POST"])
+def submit_issue_report():
+    try:
+        room_code = request.form.get("room_code", "").strip() or (request.json or {}).get("room_code", "").strip()
+        issue_type = request.form.get("issue_type", "").strip() or (request.json or {}).get("issue_type", "").strip()
+        comment = request.form.get("comment", "").strip() or (request.json or {}).get("comment", "").strip()
+
+        if not room_code or not issue_type:
+            return jsonify({"error": "room_code and issue_type are required"}), 400
+
+        photo_url = None
+        if "photo" in request.files:
+            file = request.files["photo"]
+            if file and file.filename and allowed_file(file.filename):
+                ext = secure_filename(file.filename).rsplit(".", 1)[1].lower()
+                timestamp = int(time.time())
+                storage_path = f"reports/{room_code}/report_{timestamp}.{ext}"
+                photo_url = save_image_artifact(file, storage_path)
+
+        report_id = database.create_issue_report(
+            room_code=room_code,
+            issue_type=issue_type,
+            comment=comment,
+            photo_url=photo_url,
+        )
+
+        lookup = database.get_room_lookup(room_code)
+        block = lookup.get("block", "Block B") if lookup else "Block B"
+
+        database.create_notification(
+            type_="issue_report",
+            title=f"Visitor Alert: {issue_type}",
+            message=f"Reported at {room_code} ({block}). Details: {comment or 'None'}",
+            room_id=lookup.get("roomId") if lookup else None,
+        )
+        cache.clear()
+
+        return jsonify({"success": True, "report_id": report_id}), 201
+    except Exception as e:
+        return jsonify({"error": f"Failed to submit issue report: {e}"}), 500
+
+@app.route("/api/reports/issues", methods=["GET"])
+@require_auth(allowed_roles=["admin", "manager", "inspector"])
+def get_issue_reports():
+    try:
+        status_filter = request.args.get("status")
+        block_filter = request.args.get("block")
+
+        if request.auth_user["role"] == "inspector" and not block_filter:
+            assigned = request.auth_user.get("assignedBlocks", [])
+            if assigned:
+                block_filter = assigned[0]
+
+        reports = database.get_issue_reports(status_filter=status_filter, block_filter=block_filter)
+        open_count = len([r for r in reports if r.get("status") == "open"])
+        return jsonify({"reports": reports, "open_count": open_count}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch issue reports: {e}"}), 500
+
+@app.route("/api/reports/issues/<report_id>", methods=["PATCH"])
+@require_auth(allowed_roles=["admin", "manager", "inspector"])
+def update_issue_report(report_id):
+    try:
+        data = request.get_json(silent=True) or request.form
+        new_status = data.get("status", "").strip()
+        valid = {"open", "in_progress", "resolved", "dismissed"}
+        if new_status not in valid:
+            return jsonify({"error": f"Status must be one of: {', '.join(valid)}"}), 400
+
+        updated = database.update_issue_report_status(report_id, new_status, resolved_by=request.auth_user["uid"])
+        if not updated:
+            return jsonify({"error": "Report not found"}), 404
+        cache.clear()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to update report status: {e}"}), 500
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Staff Provisioning Endpoints
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route("/api/admin/managers", methods=["POST"])
+@require_auth(allowed_roles=["admin"])
+def create_manager():
+    try:
+        data = request.get_json(silent=True) or request.form
+        email = data.get("email", "").strip()
+        password = data.get("password", "").strip()
+        name = data.get("name", "").strip()
+
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
+
+        try:
+            user = auth.get_user_by_email(email)
+        except auth.UserNotFoundError:
+            user = auth.create_user(email=email, password=password, display_name=name or email.split("@")[0])
+
+        firebase_config.set_user_claims(user.uid, role="manager", assigned_blocks=[])
+        cache.clear()
+
+        return jsonify({"success": True, "uid": user.uid, "email": email, "role": "manager"}), 201
+    except Exception as e:
+        return jsonify({"error": f"Failed to create manager: {e}"}), 500
+
+@app.route("/api/manager/inspectors", methods=["POST"])
+@require_auth(allowed_roles=["admin", "manager"])
+def create_inspector():
+    try:
+        data = request.get_json(silent=True) or request.form
+        email = data.get("email", "").strip()
+        password = data.get("password", "").strip()
+        name = data.get("name", "").strip()
+        assigned_blocks = data.get("assignedBlocks", []) or data.get("assigned_blocks", [])
+
+        if not email or not password:
+            return jsonify({"error": "Email and password are required"}), 400
+
+        try:
+            user = auth.get_user_by_email(email)
+        except auth.UserNotFoundError:
+            user = auth.create_user(email=email, password=password, display_name=name or email.split("@")[0])
+
+        firebase_config.set_user_claims(user.uid, role="inspector", assigned_blocks=assigned_blocks)
+        cache.clear()
+
+        return jsonify({"success": True, "uid": user.uid, "email": email, "role": "inspector", "assignedBlocks": assigned_blocks}), 201
+    except Exception as e:
+        return jsonify({"error": f"Failed to create inspector: {e}"}), 500
+
+@app.route("/api/admin/staff", methods=["GET"])
+@require_auth(allowed_roles=["admin", "manager"])
+def list_staff():
+    try:
+        staff = database.get_staff_users()
+        return jsonify({"staff": staff}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to list staff: {e}"}), 500
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Rooms & Scans
+# ─────────────────────────────────────────────────────────────────────────────
 
 @app.route("/api/rooms", methods=["POST"])
+@require_auth(allowed_roles=["admin", "manager"])
 def create_room():
-    """Create a new room with name and block."""
     try:
-        name = request.form.get("name", "").strip()
-        block = request.form.get("block", "").strip()
+        data = request.get_json(silent=True) or request.form
+        name = data.get("name", "").strip()
+        block = data.get("block", "").strip()
+        floor = data.get("floor", "Floor 1").strip()
+        room_number = data.get("roomNumber", "").strip()
 
-        if not name:
-            return jsonify({"error": "Room name is required"}), 400
-        if not block:
-            return jsonify({"error": "Block is required"}), 400
-        if len(name) > 100:
-            return jsonify({"error": "Room name must be 100 characters or fewer"}), 400
+        if not name or not block:
+            return jsonify({"error": "Room name and block are required"}), 400
 
-        room_id = database.add_room(name, block)
-        return jsonify({"success": True, "room_id": room_id}), 201
-    except Exception:
-        return jsonify({"error": "Failed to create room"}), 500
-
+        room_id, room_code = database.add_room(name=name, block=block, floor=floor, room_number=room_number, created_by=request.auth_user["uid"])
+        cache.clear()
+        return jsonify({"success": True, "room_id": room_id, "room_code": room_code}), 201
+    except Exception as e:
+        return jsonify({"error": f"Failed to create room: {e}"}), 500
 
 @app.route("/api/rooms", methods=["GET"])
+@require_auth()
 @cache.cached(timeout=15, query_string=True)
 def get_rooms():
-    """Return all rooms with their latest scan info."""
     try:
-        rooms = database.get_all_rooms()
+        block = request.args.get("block")
+        rooms = database.get_all_rooms(block_filter=block)
         return jsonify({"rooms": rooms}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch rooms"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch rooms: {e}"}), 500
 
-
-@app.route("/api/rooms/<int:room_id>", methods=["GET"])
+@app.route("/api/rooms/<room_id>", methods=["GET"])
+@require_auth()
 def get_room(room_id):
-    """Return a single room by ID."""
     try:
         room = database.get_room(room_id)
-        if room is None:
+        if not room:
             return jsonify({"error": "Room not found"}), 404
         return jsonify({"room": room}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch room"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch room: {e}"}), 500
 
-
-@app.route("/api/rooms/<int:room_id>/baseline", methods=["POST"])
+@app.route("/api/rooms/<room_id>/baseline", methods=["POST"])
+@require_auth(allowed_roles=["admin", "manager", "inspector"])
 def upload_baseline(room_id):
-    """Upload or replace the baseline (clean reference) image for a room."""
     try:
         room = database.get_room(room_id)
-        if room is None:
+        if not room:
             return jsonify({"error": "Room not found"}), 404
 
         if "image" not in request.files:
             return jsonify({"error": "No image file provided"}), 400
 
         file = request.files["image"]
-        if not file.filename:
-            return jsonify({"error": "No image file selected"}), 400
-        if not allowed_file(file.filename):
+        if not file.filename or not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type. Allowed: jpg, jpeg, png, webp"}), 400
 
         ext = secure_filename(file.filename).rsplit(".", 1)[1].lower()
-        save_filename = f"{room_id}_baseline.{ext}"
-        save_path = os.path.join(BASELINES_FOLDER, save_filename)
-        file.save(save_path)
+        storage_path = f"rooms/{room_id}/baseline.{ext}"
 
-        relative_path = f"uploads/baselines/{save_filename}"
-        database.set_baseline(room_id, relative_path)
+        image_url = save_image_artifact(file, storage_path)
+        database.set_baseline(room_id, image_url)
+        cache.clear()
 
-        return jsonify({"success": True, "image_path": relative_path}), 200
-    except Exception:
-        return jsonify({"error": "Failed to upload baseline image"}), 500
-
+        return jsonify({"success": True, "image_path": image_url}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to upload baseline image: {e}"}), 500
 
 @app.route("/api/scan", methods=["POST"])
+@require_auth(allowed_roles=["admin", "manager", "inspector"])
 def scan_image():
-    """Upload a scan image and return an AI cleanliness prediction."""
     try:
-        room_id_str = request.form.get("room_id", "")
-        if not room_id_str:
+        room_id = request.form.get("room_id", "").strip()
+        if not room_id:
             return jsonify({"error": "room_id is required"}), 400
 
-        try:
-            room_id = int(room_id_str)
-        except ValueError:
-            return jsonify({"error": "room_id must be an integer"}), 400
-
         room = database.get_room(room_id)
-        if room is None:
+        if not room:
             return jsonify({"error": "Room not found"}), 404
 
         if "image" not in request.files:
             return jsonify({"error": "No image file provided"}), 400
 
         file = request.files["image"]
-        if not file.filename:
-            return jsonify({"error": "No image file selected"}), 400
-        if not allowed_file(file.filename):
+        if not file.filename or not allowed_file(file.filename):
             return jsonify({"error": "Invalid file type. Allowed: jpg, jpeg, png, webp"}), 400
 
         ext = secure_filename(file.filename).rsplit(".", 1)[1].lower()
         timestamp = int(time.time())
-        save_filename = f"{room_id}_{timestamp}.{ext}"
-        save_path = os.path.join(SCANS_FOLDER, save_filename)
-        file.save(save_path)
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
+            file.save(tmp.name)
+            tmp_path = tmp.name
 
-        prediction = model.predict(save_path)
+        try:
+            prediction = model.predict(tmp_path)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
-        relative_path = f"uploads/scans/{save_filename}"
+        storage_path = f"rooms/{room_id}/scans/scan_{timestamp}.{ext}"
+        image_url = save_image_artifact(file, storage_path)
+
         scan_id = database.add_scan(
-            room_id, relative_path, prediction["score"], prediction["status"]
+            room_id=room_id,
+            image_path=image_url,
+            score=prediction["score"],
+            status=prediction["status"],
+            scanned_by=request.auth_user["uid"],
         )
 
-        # Auto-create notification for attention-needed scans
         if prediction["status"] in ("dirty", "needs_attention"):
             status_label = "Dirty" if prediction["status"] == "dirty" else "Needs attention"
             room_name = room.get("name", f"Room {room_id}")
             database.create_notification(
-                "scan_result",
-                f"{status_label}: {room_name}",
-                f"{room_name} scored {prediction['score']}/100. Immediate attention required." if prediction["status"] == "dirty"
-                else f"{room_name} scored {prediction['score']}/100. Schedule a cleaning check soon.",
-                room_id
+                type_="scan_result",
+                title=f"{status_label}: {room_name}",
+                message=f"{room_name} scored {prediction['score']}/100.",
+                room_id=room_id,
             )
 
-        return jsonify(
-            {
-                "scan_id": scan_id,
-                "score": prediction["score"],
-                "status": prediction["status"],
-                "room_id": room_id,
-                "image_path": relative_path,
-                "mock": prediction["mock"],
-            }
-        ), 200
-    except Exception:
-        return jsonify({"error": "Scan failed. Please try again."}), 500
+        cache.clear()
+        return jsonify({
+            "scan_id": scan_id,
+            "score": prediction["score"],
+            "status": prediction["status"],
+            "room_id": room_id,
+            "image_path": image_url,
+            "mock": prediction["mock"],
+        }), 200
+    except Exception as e:
+        return jsonify({"error": f"Scan failed: {e}"}), 500
 
-
-@app.route("/api/rooms/<int:room_id>/history", methods=["GET"])
+@app.route("/api/rooms/<room_id>/history", methods=["GET"])
+@require_auth()
 def get_history(room_id):
-    """Return scan history for a room, most recent first."""
     try:
-        room = database.get_room(room_id)
-        if room is None:
-            return jsonify({"error": "Room not found"}), 404
-
         limit = request.args.get("limit", 20, type=int)
-        limit = max(1, min(limit, 100))  # clamp 1–100
         history = database.get_scan_history(room_id, limit)
         return jsonify({"history": history}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch history"}), 500
-
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch history: {e}"}), 500
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
-    """Health check endpoint. Used by deploy monitors."""
     return jsonify({"status": "ok", "mock_mode": model.MOCK_MODE}), 200
 
-
-@app.route("/api/rooms/<int:room_id>", methods=["DELETE"])
+@app.route("/api/rooms/<room_id>", methods=["DELETE"])
+@require_auth(allowed_roles=["admin", "manager"])
 def delete_room(room_id):
-    """Delete a room and all its scans, including uploaded image files."""
     try:
-        image_paths = database.delete_room(room_id)
-        if image_paths is None:
+        deleted = database.delete_room(room_id)
+        if deleted is None:
             return jsonify({"error": "Room not found"}), 404
-
-        # Clean up uploaded image files from disk
-        backend_dir = os.path.dirname(__file__)
-        for rel_path in image_paths:
-            abs_path = os.path.join(backend_dir, rel_path)
-            try:
-                if os.path.exists(abs_path):
-                    os.remove(abs_path)
-            except OSError:
-                pass  # best-effort cleanup
-
         cache.clear()
         return "", 204
-    except Exception:
-        return jsonify({"error": "Failed to delete room"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete room: {e}"}), 500
 
-
-@app.route("/api/scans/<int:scan_id>", methods=["DELETE"])
+@app.route("/api/scans/<scan_id>", methods=["DELETE"])
+@require_auth(allowed_roles=["admin", "manager"])
 def delete_scan(scan_id):
-    """Delete a single scan record and its uploaded image."""
     try:
-        scan = database.get_scan(scan_id)
-        if scan is None:
+        deleted = database.delete_scan(scan_id)
+        if not deleted:
             return jsonify({"error": "Scan not found"}), 404
-
-        database.delete_scan(scan_id)
-
-        # Clean up the scan image file
-        if scan.get("image_path"):
-            backend_dir = os.path.dirname(__file__)
-            abs_path = os.path.join(backend_dir, scan["image_path"])
-            try:
-                if os.path.exists(abs_path):
-                    os.remove(abs_path)
-            except OSError:
-                pass
-
         cache.clear()
         return "", 204
-    except Exception:
-        return jsonify({"error": "Failed to delete scan"}), 500
-
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete scan: {e}"}), 500
 
 @app.route("/api/reports/summary", methods=["GET"])
+@require_auth()
 @cache.cached(timeout=60, query_string=True)
 def reports_summary():
-    """Aggregate cleanliness stats across all rooms for the Reports screen."""
     try:
         days = request.args.get("days", default=7, type=int)
-        days = max(1, min(days, 30))  # clamp 1-30
         summary = database.get_reports_summary(days=days)
         return jsonify(summary), 200
-    except Exception:
-        return jsonify({"error": "Failed to generate report summary"}), 500
-
-@app.route("/api/rooms/<int:room_id>", methods=["PATCH"])
-def update_room(room_id):
-    """Update a room's name and/or block."""
-    try:
-        name = request.form.get("name", "").strip()
-        block = request.form.get("block", "").strip()
-        if not name:
-            return jsonify({"error": "Room name is required"}), 400
-        if not block:
-            return jsonify({"error": "Block is required"}), 400
-        if len(name) > 100:
-            return jsonify({"error": "Room name must be 100 characters or fewer"}), 400
-        updated = database.update_room(room_id, name, block)
-        if not updated:
-            return jsonify({"error": "Room not found"}), 404
-        cache.clear()
-        return jsonify({"success": True}), 200
-    except Exception:
-        return jsonify({"error": "Failed to update room"}), 500
-
-
-# --------------------------------------------------------------------------- #
-# Cleaning Requests                                                             #
-# --------------------------------------------------------------------------- #
-
-@app.route("/api/cleaning-requests", methods=["POST"])
-def create_cleaning_request():
-    """Submit a new cleaning request."""
-    try:
-        room_id_str = request.form.get("room_id", "")
-        if not room_id_str:
-            return jsonify({"error": "room_id is required"}), 400
-        try:
-            room_id = int(room_id_str)
-        except ValueError:
-            return jsonify({"error": "room_id must be an integer"}), 400
-
-        room = database.get_room(room_id)
-        if room is None:
-            return jsonify({"error": "Room not found"}), 404
-
-        requested_by_name = request.form.get("requested_by_name", "Patient").strip()
-        requested_by_email = request.form.get("requested_by_email", "").strip()
-        reason = request.form.get("reason", "").strip()
-
-        req_id = database.create_cleaning_request(room_id, requested_by_name, requested_by_email, reason)
-
-        # Auto-notify admins
-        database.create_notification(
-            "cleaning_request",
-            f"Cleaning requested: {room['name']}",
-            f"{requested_by_name} requested cleaning for {room['name']} ({room['block']}). Reason: {reason or 'Not specified'}",
-            room_id
-        )
-
-        return jsonify({"success": True, "request_id": req_id}), 201
-    except Exception:
-        return jsonify({"error": "Failed to submit cleaning request"}), 500
-
-
-@app.route("/api/cleaning-requests", methods=["GET"])
-def get_cleaning_requests():
-    """List all cleaning requests (optionally filtered by status)."""
-    try:
-        status_filter = request.args.get("status")
-        requests_list = database.get_cleaning_requests(status_filter)
-        pending_count = database.get_pending_request_count()
-        return jsonify({"requests": requests_list, "pending_count": pending_count}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch cleaning requests"}), 500
-
-
-@app.route("/api/cleaning-requests/<int:request_id>", methods=["PATCH"])
-def update_cleaning_request(request_id):
-    """Update cleaning request status (admin action)."""
-    try:
-        new_status = request.form.get("status", "").strip()
-        valid = {"pending", "in_progress", "completed", "dismissed"}
-        if new_status not in valid:
-            return jsonify({"error": f"Status must be one of: {', '.join(valid)}"}), 400
-        updated = database.update_cleaning_request_status(request_id, new_status)
-        if not updated:
-            return jsonify({"error": "Request not found"}), 404
-        return jsonify({"success": True}), 200
-    except Exception:
-        return jsonify({"error": "Failed to update request"}), 500
-
-
-@app.route("/api/rooms/<int:room_id>/cleaning-requests", methods=["GET"])
-def get_room_cleaning_requests(room_id):
-    """Get cleaning requests for a specific room."""
-    try:
-        room = database.get_room(room_id)
-        if room is None:
-            return jsonify({"error": "Room not found"}), 404
-        requests_list = database.get_room_cleaning_requests(room_id)
-        return jsonify({"requests": requests_list}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch requests"}), 500
-
-
-# --------------------------------------------------------------------------- #
-# Notifications                                                                 #
-# --------------------------------------------------------------------------- #
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate report summary: {e}"}), 500
 
 @app.route("/api/notifications", methods=["GET"])
+@require_auth()
 def get_notifications():
-    """List notifications, most recent first."""
     try:
         limit = request.args.get("limit", 50, type=int)
-        limit = max(1, min(limit, 200))
-        notifications = database.get_notifications(limit)
+        notifications = database.get_notifications(limit=limit)
         unread_count = database.get_unread_notification_count()
         return jsonify({"notifications": notifications, "unread_count": unread_count}), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch notifications"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch notifications: {e}"}), 500
 
-
-@app.route("/api/notifications/<int:notification_id>/read", methods=["PATCH"])
+@app.route("/api/notifications/<notification_id>/read", methods=["PATCH"])
+@require_auth()
 def mark_notification_read(notification_id):
-    """Mark a notification as read."""
     try:
         updated = database.mark_notification_read(notification_id)
         if not updated:
             return jsonify({"error": "Notification not found"}), 404
         return jsonify({"success": True}), 200
-    except Exception:
-        return jsonify({"error": "Failed to mark notification"}), 500
-
+    except Exception as e:
+        return jsonify({"error": f"Failed to mark notification: {e}"}), 500
 
 @app.route("/api/notifications/mark-all-read", methods=["POST"])
+@require_auth()
 def mark_all_notifications_read():
-    """Mark all notifications as read."""
     try:
         database.mark_all_notifications_read()
         return jsonify({"success": True}), 200
-    except Exception:
-        return jsonify({"error": "Failed to mark all notifications"}), 500
-
-
-@app.route("/api/notifications/<int:notification_id>", methods=["DELETE"])
-def delete_notification(notification_id):
-    """Delete a notification."""
-    try:
-        deleted = database.delete_notification(notification_id)
-        if not deleted:
-            return jsonify({"error": "Notification not found"}), 404
-        return "", 204
-    except Exception:
-        return jsonify({"error": "Failed to delete notification"}), 500
-
-
-# --------------------------------------------------------------------------- #
-# Admin Stats                                                                   #
-# --------------------------------------------------------------------------- #
+    except Exception as e:
+        return jsonify({"error": f"Failed to mark notifications: {e}"}), 500
 
 @app.route("/api/admin/stats", methods=["GET"])
+@require_auth(allowed_roles=["admin", "manager"])
 def admin_stats():
-    """System statistics for admin panel."""
     try:
         stats = database.get_system_stats()
         stats["mock_mode"] = model.MOCK_MODE
         return jsonify(stats), 200
-    except Exception:
-        return jsonify({"error": "Failed to fetch stats"}), 500
-
-
-
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch stats: {e}"}), 500
 
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
-    """
-    Serve uploaded baseline and scan images.
-    Only files inside the uploads directory are accessible.
-    """
-    # Resolve and validate path to prevent directory traversal
-    safe_uploads = os.path.realpath(UPLOAD_FOLDER)
-    requested = os.path.realpath(os.path.join(UPLOAD_FOLDER, filename))
-    if not requested.startswith(safe_uploads + os.sep):
+    upload_folder = os.path.join(os.path.dirname(__file__), "uploads")
+    safe_uploads = os.path.realpath(upload_folder)
+    requested = os.path.realpath(os.path.join(upload_folder, filename))
+    if not requested.startswith(safe_uploads + os.sep) and requested != safe_uploads:
         return jsonify({"error": "Forbidden"}), 403
-    response = send_from_directory(UPLOAD_FOLDER, filename, max_age=31536000)
-    response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-    return response
-
-
-# --------------------------------------------------------------------------- #
-# Entry Point                                                                   #
-# --------------------------------------------------------------------------- #
+    return send_from_directory(upload_folder, filename)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

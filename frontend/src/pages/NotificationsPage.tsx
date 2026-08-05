@@ -8,20 +8,19 @@ import {
   AlertTriangle,
   ClipboardList,
   CheckCircle2,
-  Eye,
   Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { api, type Notification } from "@/lib/api";
+import { api } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 
 const FILTER_TABS: { value: string; label: string }[] = [
-  { value: "all",    label: "All" },
-  { value: "unread", label: "Unread" },
-  { value: "scans",  label: "Scan Alerts" },
-  { value: "requests", label: "Cleaning Requests" },
+  { value: "all",      label: "All" },
+  { value: "unread",   label: "Unread" },
+  { value: "scans",    label: "Scan Alerts" },
+  { value: "requests", label: "Visitor Alerts" },
 ];
 
 export function NotificationsPage() {
@@ -38,7 +37,7 @@ export function NotificationsPage() {
   const unreadCount = data?.unread_count ?? 0;
 
   const markReadMutation = useMutation({
-    mutationFn: (id: number) => api.markNotificationRead(id),
+    mutationFn: (id: string | number) => api.markNotificationRead(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -54,7 +53,7 @@ export function NotificationsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.deleteNotification(id),
+    mutationFn: (id: string | number) => api.deleteNotification(id),
     onSuccess: () => {
       toast.success("Notification deleted.");
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -63,14 +62,14 @@ export function NotificationsPage() {
   });
 
   const filtered = notifications.filter((n) => {
-    if (filter === "unread") return n.is_read === 0;
+    if (filter === "unread") return !n.is_read;
     if (filter === "scans") return n.type === "scan_result";
-    if (filter === "requests") return n.type === "cleaning_request";
+    if (filter === "requests") return n.type === "issue_report" || n.type === "cleaning_request";
     return true;
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 page-enter space-y-6">
+    <div className="mx-auto max-w-4xl px-4 sm:px-6 py-6 sm:py-8 page-enter space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -78,7 +77,9 @@ export function NotificationsPage() {
             <Bell className="h-6 w-6 text-primary" /> Notifications & Alerts
           </h1>
           <p className="mt-1 text-sm text-text-muted">
-            Stay updated on room cleanliness scans and service requests.
+            {unreadCount > 0
+              ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}.`
+              : "You're all caught up!"}
           </p>
         </div>
 
@@ -90,20 +91,20 @@ export function NotificationsPage() {
             isLoading={markAllReadMutation.isPending}
             className="gap-1.5"
           >
-            <CheckCheck className="h-4 w-4 text-primary" /> Mark all read ({unreadCount})
+            <CheckCheck className="h-4 w-4" /> Mark all read
           </Button>
         )}
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1 w-fit shadow-card">
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-surface p-1 shadow-card overflow-x-auto">
         <Filter className="ml-2 h-3.5 w-3.5 text-text-disabled shrink-0" />
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.value}
             onClick={() => setFilter(tab.value)}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all",
+              "rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all whitespace-nowrap",
               filter === tab.value
                 ? "bg-primary text-white shadow-sm"
                 : "text-text-muted hover:text-text-primary"
@@ -116,63 +117,61 @@ export function NotificationsPage() {
 
       {/* Notification List */}
       <div className="space-y-3">
-        {isLoading &&
+        {isLoading && (
           Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-20 skeleton rounded-xl" />
-          ))}
+          ))
+        )}
 
         {!isLoading && filtered.length === 0 && (
-          <div className="rounded-2xl border border-border bg-surface p-12 text-center">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-            <h3 className="mt-3 text-base font-semibold text-text-primary">All caught up!</h3>
+          <div className="flex flex-col items-center justify-center py-16 text-center rounded-xl border border-border bg-surface p-8 shadow-card">
+            <Bell className="h-12 w-12 text-text-disabled" />
+            <p className="mt-3 text-base font-semibold text-text-primary">No Notifications</p>
             <p className="mt-1 text-sm text-text-muted">
-              {filter === "unread" ? "No unread notifications." : "No notifications in this category."}
+              {filter === "all"
+                ? "Notifications will appear here when room scans or alerts occur."
+                : `No ${filter} notifications.`}
             </p>
           </div>
         )}
 
-        {filtered.map((item: Notification) => {
-          const isUnread = item.is_read === 0;
-          const isScan = item.type === "scan_result";
+        {filtered.map((item) => {
+          const isUnread = !item.is_read;
+          const dateObj = new Date(item.createdAt || Date.now());
 
           return (
             <div
               key={item.id}
               className={cn(
-                "group relative flex items-start gap-4 rounded-xl border p-4 shadow-card transition-all hover:shadow-raised",
+                "flex items-start gap-4 rounded-xl border p-4 shadow-card transition-all hover:shadow-raised",
                 isUnread
-                  ? "border-primary/40 bg-highlight/60 border-l-4 border-l-primary"
+                  ? "border-primary/40 bg-primary/5"
                   : "border-border bg-surface"
               )}
             >
-              {/* Icon */}
-              <div
-                className={cn(
-                  "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                  isScan ? "bg-warning-bg text-warning" : "bg-primary/10 text-primary"
+              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-highlight text-primary">
+                {item.type === "scan_result" ? (
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                ) : (
+                  <ClipboardList className="h-4 w-4 text-primary" />
                 )}
-              >
-                {isScan ? <AlertTriangle className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
               </div>
 
-              {/* Body */}
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-semibold text-text-primary">{item.title}</h4>
-                  {isUnread && (
-                    <span className="h-2 w-2 rounded-full bg-primary" />
-                  )}
+                  {isUnread && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </div>
-                <p className="text-sm text-text-muted">{item.message}</p>
-                <div className="flex items-center gap-3 text-xs text-text-disabled pt-1">
-                  <span>{formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}</span>
+                <p className="text-xs sm:text-sm text-text-muted">{item.message}</p>
+                <div className="flex items-center gap-3 text-[11px] text-text-disabled pt-1">
+                  <span>{formatDistanceToNow(dateObj, { addSuffix: true })}</span>
                   <span>·</span>
-                  <span>{format(new Date(item.created_at), "dd MMM yyyy, HH:mm")}</span>
-                  {item.room_id && (
+                  <span>{format(dateObj, "dd MMM yyyy, HH:mm")}</span>
+                  {item.roomId && (
                     <>
                       <span>·</span>
                       <Link
-                        to={`/dashboard/rooms/${item.room_id}`}
+                        to={`/dashboard/rooms/${item.roomId}`}
                         className="font-medium text-primary hover:underline"
                       >
                         View Room →
@@ -182,21 +181,20 @@ export function NotificationsPage() {
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1">
                 {isUnread && (
                   <button
                     onClick={() => markReadMutation.mutate(item.id)}
-                    className="rounded-lg p-1.5 text-text-disabled hover:bg-bg hover:text-primary transition-colors"
-                    title="Mark read"
+                    className="rounded-lg p-1.5 text-text-disabled hover:bg-highlight hover:text-primary transition-colors"
+                    title="Mark as read"
                   >
-                    <Eye className="h-4 w-4" />
+                    <CheckCircle2 className="h-4 w-4" />
                   </button>
                 )}
                 <button
                   onClick={() => deleteMutation.mutate(item.id)}
                   className="rounded-lg p-1.5 text-text-disabled hover:bg-danger-bg hover:text-danger transition-colors"
-                  title="Delete notification"
+                  title="Delete"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>

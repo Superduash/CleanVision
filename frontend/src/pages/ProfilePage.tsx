@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { toast } from "sonner";
-import { User, Mail, ShieldCheck, UserCheck, LogOut, Save } from "lucide-react";
+import { User, Mail, ShieldCheck, LogOut, Save } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/Input";
 
@@ -11,8 +11,6 @@ export function ProfilePage() {
   const { session, signOut } = useAuth();
   const [name, setName] = useState(session?.name ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const isAdmin = session?.role === "admin";
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,16 +61,8 @@ export function ProfilePage() {
         <div className="min-w-0 flex-1">
           <h2 className="text-xl font-bold text-text-primary truncate">{session?.name}</h2>
           <p className="text-sm text-text-muted truncate">{session?.email}</p>
-          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-highlight px-3 py-1 text-xs font-semibold text-primary border border-primary/20">
-            {isAdmin ? (
-              <>
-                <ShieldCheck className="h-3.5 w-3.5" /> Admin / Staff
-              </>
-            ) : (
-              <>
-                <UserCheck className="h-3.5 w-3.5" /> Patient / Guest
-              </>
-            )}
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-highlight px-3 py-1 text-xs font-semibold text-primary border border-primary/20 capitalize">
+            <ShieldCheck className="h-3.5 w-3.5" /> Staff Role: {session?.role || "Staff"}
           </div>
         </div>
       </div>

@@ -1,22 +1,13 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Toaster } from "sonner";
 import { App } from "./App";
 import { AuthContext, useProvideAuth } from "@/hooks/useAuth";
 import { ThemeProvider } from "@/hooks/useTheme";
 import "./styles/globals.css";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      staleTime: 60_000,
-      gcTime: 10 * 60 * 1000, // Keep data in memory for 10 minutes
-    },
-  },
-});
 
 function Root() {
   const auth = useProvideAuth();
