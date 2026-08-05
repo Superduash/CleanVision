@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Github } from "lucide-react";
 
 export function Footer() {
   return (
@@ -49,7 +48,7 @@ export function Footer() {
           <nav className="flex flex-col gap-3 text-sm text-text-muted">
             <Link to="/privacy" className="transition-colors hover:text-primary">Privacy Policy</Link>
             <Link to="/terms" className="transition-colors hover:text-primary">Terms of Service</Link>
-            <a href="https://github.com/Superduash/CleanVision/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-primary">MIT License</a>
+            <span className="text-text-muted">Enterprise License</span>
           </nav>
         </div>
       </div>
@@ -58,12 +57,6 @@ export function Footer() {
         <p className="text-sm text-text-muted">
           © {new Date().getFullYear()} CleanVision. All rights reserved.
         </p>
-        <div className="mt-4 flex gap-4 sm:mt-0">
-          <a href="https://github.com/Superduash/CleanVision" target="_blank" rel="noopener noreferrer" className="text-text-muted transition-colors hover:text-primary">
-            <span className="sr-only">GitHub</span>
-            <Github className="h-5 w-5" />
-          </a>
-        </div>
       </div>
     </footer>
   );

@@ -421,38 +421,6 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
                   </Button>
                 </form>
 
-                {/* Quick Demo Accounts for Development */}
-                <div className="mt-6 border-t border-border pt-4">
-                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
-                    Development Quick Fill
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        loginForm.setValue("email", "demo@gmail.com");
-                        loginForm.setValue("password", "demo1234");
-                      }}
-                      className="rounded-xl border border-border bg-bg p-2.5 text-left hover:border-primary/40 hover:bg-highlight transition-all"
-                    >
-                      <p className="text-xs font-bold text-text-primary">Patient Demo</p>
-                      <p className="text-[10px] text-text-muted truncate">demo@gmail.com</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        loginForm.setValue("email", "aashwinsuperdu@gmail.com");
-                        loginForm.setValue("password", "admin1234");
-                      }}
-                      className="rounded-xl border border-border bg-bg p-2.5 text-left hover:border-primary/40 hover:bg-highlight transition-all"
-                    >
-                      <p className="text-xs font-bold text-primary">Admin Super</p>
-                      <p className="text-[10px] text-text-muted truncate">aashwinsuperdu@gmail.com</p>
-                    </button>
-                  </div>
-                </div>
-
                 <p className="mt-5 text-center text-xs text-text-muted">
                   No account?{" "}
                   <Link

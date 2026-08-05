@@ -1,6 +1,16 @@
+import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/Button";
 
 export function ContactPage() {
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitted(true);
+    toast.success("Thank you! Your message has been sent to support.");
+  };
+
   return (
     <div className="mx-auto max-w-4xl px-6 py-24 lg:py-32">
       <div className="max-w-2xl">
@@ -9,30 +19,32 @@ export function ContactPage() {
       </div>
       
       <div className="mt-16 grid gap-12 md:grid-cols-2">
-        <form className="flex flex-col gap-6 rounded-2xl border border-border bg-surface p-8 shadow-raised" onSubmit={(e) => e.preventDefault()}>
+        <form className="flex flex-col gap-6 rounded-2xl border border-border bg-surface p-8 shadow-raised" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-text-primary">Name</label>
-            <input type="text" className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Jane Doe" />
+            <input required type="text" className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" placeholder="Jane Doe" />
           </div>
           <div>
             <label className="block text-sm font-medium text-text-primary">Email</label>
-            <input type="email" className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" placeholder="jane@hospital.org" />
+            <input required type="email" className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" placeholder="jane@hospital.org" />
           </div>
           <div>
             <label className="block text-sm font-medium text-text-primary">Message</label>
-            <textarea className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-32 resize-none" placeholder="How can we help?" />
+            <textarea required className="mt-2 w-full rounded-lg border border-border bg-bg px-4 py-2 text-text-primary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-32 resize-none" placeholder="How can we help?" />
           </div>
-          <Button type="button" className="w-full">Send Message</Button>
+          <Button type="submit" className="w-full" disabled={submitted}>
+            {submitted ? "Message Sent!" : "Send Message"}
+          </Button>
         </form>
 
         <div className="flex flex-col justify-center gap-8">
           <div>
             <h3 className="font-bold text-text-primary">Email Support</h3>
-            <p className="mt-1 text-sm text-text-muted">support@cleanvision.example.com</p>
+            <p className="mt-1 text-sm text-text-muted">support@cleanvision.com</p>
           </div>
           <div>
             <h3 className="font-bold text-text-primary">Sales Enquiries</h3>
-            <p className="mt-1 text-sm text-text-muted">sales@cleanvision.example.com</p>
+            <p className="mt-1 text-sm text-text-muted">sales@cleanvision.com</p>
           </div>
           <div>
             <h3 className="font-bold text-text-primary">Office Hours</h3>

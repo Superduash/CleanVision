@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-export const SUPER_ADMIN_EMAIL = "aashwinsuperdu@gmail.com";
+export const SUPER_ADMIN_EMAIL = "admin@cleanvision.com";
 
 export interface AdminRecord {
   email: string;

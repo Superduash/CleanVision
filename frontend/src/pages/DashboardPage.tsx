@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useDeferredValue } from "react";
 import { Link } from "react-router-dom";
 import {
   Plus,
@@ -134,6 +134,7 @@ export function DashboardPage() {
   const { data: summary } = useSummary();
 
   const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
   const [deletingRoom, setDeletingRoom] = useState<Room | null>(null);
   const [requestingRoom, setRequestingRoom] = useState<Room | null>(null);
 
@@ -151,9 +152,9 @@ export function DashboardPage() {
 
   const filteredRooms = safeRooms.filter(
     (r) =>
-      !search ||
-      r.name?.toLowerCase().includes(search.toLowerCase()) ||
-      r.block?.toLowerCase().includes(search.toLowerCase())
+      !deferredSearch ||
+      r.name?.toLowerCase().includes(deferredSearch.toLowerCase()) ||
+      r.block?.toLowerCase().includes(deferredSearch.toLowerCase())
   );
 
   const totalCount = safeRooms.length;

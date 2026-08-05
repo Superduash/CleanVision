@@ -39,11 +39,20 @@ export default defineConfig({
         rollupOptions: {
             output: {
                 manualChunks(id) {
-                    if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) {
-                        return "react";
+                    if (id.includes("node_modules/react/") || id.includes("node_modules/react-dom/")) {
+                        return "react-vendor";
+                    }
+                    if (id.includes("node_modules/react-router") || id.includes("node_modules/@remix-run")) {
+                        return "router";
                     }
                     if (id.includes("node_modules/@tanstack")) {
                         return "query";
+                    }
+                    if (id.includes("node_modules/firebase")) {
+                        return "firebase";
+                    }
+                    if (id.includes("node_modules/recharts")) {
+                        return "charts";
                     }
                     if (id.includes("node_modules/lucide-react")) {
                         return "icons";
