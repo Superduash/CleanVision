@@ -6,7 +6,7 @@ export function useRooms() {
     queryKey: ["rooms"],
     queryFn: api.listRooms,
     refetchOnWindowFocus: true,
-    select: (data) => data.rooms,
+    select: (data) => data?.rooms ?? [],
   });
 }
 
@@ -15,7 +15,7 @@ export function useRoom(roomId: number) {
     queryKey: ["room", roomId],
     queryFn: () => api.getRoom(roomId),
     enabled: !!roomId,
-    select: (data) => data.room,
+    select: (data) => data?.room,
   });
 }
 
@@ -25,7 +25,7 @@ export function useRoomHistory(roomId: number) {
     queryFn: () => api.getHistory(roomId),
     enabled: !!roomId,
     refetchOnWindowFocus: true,
-    select: (data) => data.history,
+    select: (data) => data?.history ?? [],
   });
 }
 

@@ -53,6 +53,8 @@ const CleaningRequestsPage = lazy(() =>
   import("@/pages/CleaningRequestsPage").then((m) => ({ default: m.CleaningRequestsPage })),
 );
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+
 function PageLoader() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
@@ -80,7 +82,8 @@ function RoleGuard({
 
 export function App() {
   return (
-    <Routes>
+    <ErrorBoundary>
+      <Routes>
       {/* Public Pages */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<LandingPage />} />
@@ -233,5 +236,6 @@ export function App() {
       <Route path="/404" element={<NotFoundPage />} />
       <Route path="*" element={<Navigate to="/404" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }

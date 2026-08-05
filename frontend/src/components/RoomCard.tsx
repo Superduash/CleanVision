@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { formatDistanceToNow } from "date-fns";
+import { safeFormatDistanceToNow } from "@/lib/dateUtils";
 import { MapPin, ChevronRight, MoreVertical, Eye, Edit2, ScanLine, Trash2, BellRing } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { ScoreRing } from "./ScoreRing";
@@ -76,9 +76,7 @@ export function RoomCard({ room, onDelete, onRequestCleaning }: RoomCardProps) {
           )}
           {room.last_scanned && (
             <span className="text-[11px] text-text-muted">
-              {formatDistanceToNow(new Date(room.last_scanned), {
-                addSuffix: true,
-              })}
+              {safeFormatDistanceToNow(room.last_scanned, { addSuffix: true })}
             </span>
           )}
         </div>

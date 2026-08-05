@@ -147,17 +147,19 @@ export function DashboardPage() {
     onError: () => toast.error("Failed to delete room."),
   });
 
-  const filteredRooms = rooms.filter(
+  const safeRooms = Array.isArray(rooms) ? rooms : [];
+
+  const filteredRooms = safeRooms.filter(
     (r) =>
       !search ||
-      r.name.toLowerCase().includes(search.toLowerCase()) ||
+      r.name?.toLowerCase().includes(search.toLowerCase()) ||
       r.block?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalCount = rooms.length;
-  const cleanCount = summary?.status_counts?.clean ?? rooms.filter((r) => r.latest_status === "clean").length;
-  const needsCount = summary?.status_counts?.needs_attention ?? rooms.filter((r) => r.latest_status === "needs_attention").length;
-  const dirtyCount = summary?.status_counts?.dirty ?? rooms.filter((r) => r.latest_status === "dirty").length;
+  const totalCount = safeRooms.length;
+  const cleanCount = summary?.status_counts?.clean ?? safeRooms.filter((r) => r.latest_status === "clean").length;
+  const needsCount = summary?.status_counts?.needs_attention ?? safeRooms.filter((r) => r.latest_status === "needs_attention").length;
+  const dirtyCount = summary?.status_counts?.dirty ?? safeRooms.filter((r) => r.latest_status === "dirty").length;
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8 page-enter space-y-8">

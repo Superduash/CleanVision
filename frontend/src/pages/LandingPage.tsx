@@ -230,16 +230,16 @@ export function LandingPage() {
       {/* ──────────────────── CTA ──────────────────── */}
       <section className="py-24 sm:py-32">
         <div className="mx-auto max-w-5xl px-6">
-          <div className="relative overflow-hidden rounded-[2rem] bg-ink px-8 py-20 text-center text-bg shadow-2xl">
-            <h2 className="mx-auto max-w-2xl font-display text-4xl font-bold tracking-tight sm:text-5xl">
+          <div className="relative overflow-hidden rounded-[2rem] bg-[#0A0F1E] px-8 py-20 text-center text-white shadow-2xl">
+            <h2 className="mx-auto max-w-2xl font-display text-4xl font-bold tracking-tight sm:text-5xl text-white">
               Ready to elevate your facility standards?
             </h2>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-bg/80">
+            <p className="mx-auto mt-6 max-w-xl text-lg text-slate-300">
               Deploy CleanVision in minutes. Stop guessing and start validating with AI-powered analytics.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/signup" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto bg-white text-ink hover:bg-white/90 active:bg-white border-transparent shadow-none">
+                <Button size="lg" className="w-full sm:w-auto bg-white text-slate-950 hover:bg-slate-100 active:bg-slate-200 border-transparent shadow-none font-semibold">
                   Create Free Account
                 </Button>
               </Link>
