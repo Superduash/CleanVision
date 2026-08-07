@@ -6,6 +6,8 @@ import {
   Send,
   QrCode,
   MapPin,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useHospitalConfig } from "@/hooks/useHospitalConfig";
@@ -28,8 +30,11 @@ export function PublicReportPage() {
   const { roomCode: paramCode } = useParams<{ roomCode?: string }>();
   const { config } = useHospitalConfig();
 
-  const [activeCode, setActiveCode] = useState<string>(paramCode || `${config.hospitalCode}-B-101-A`);
+  const [activeCode, setActiveCode] = useState<string>(paramCode || "");
   const [roomLookup, setRoomLookup] = useState<RoomLookup | null>(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [inputCode, setInputCode] = useState("");
 
   const [selectedIssue, setSelectedIssue] = useState<string>(ISSUE_CHIPS[0]);
   const [comment, setComment] = useState("");
@@ -42,27 +47,34 @@ export function PublicReportPage() {
 
   const showDemoSimulator = import.meta.env.VITE_SHOW_QR_SIMULATOR === "true";
 
-  // Fetch public room lookup for room code
+  // Fetch public room lookup for active room code
   useEffect(() => {
-    if (!activeCode) return;
+    if (!activeCode) {
+      setRoomLookup(null);
+      setLookupError(null);
+      return;
+    }
+    setLookupLoading(true);
+    setLookupError(null);
     api
       .getRoomLookup(activeCode)
       .then((res) => {
-        if (res?.roomLookup) setRoomLookup(res.roomLookup);
+        if (res?.roomLookup) {
+          setRoomLookup(res.roomLookup);
+          setLookupError(null);
+        } else {
+          setRoomLookup(null);
+          setLookupError(`Room "${activeCode}" is not registered in the system.`);
+        }
       })
       .catch(() => {
-        // Fallback default object if room not yet registered in db
-        const parts = activeCode.split("-");
-        setRoomLookup({
-          roomCode: activeCode,
-          roomId: "demo-room",
-          block: parts[1] || "Block B",
-          floor: parts[2] ? `Floor ${parts[2][0]}` : "Floor 1",
-          roomNumber: parts[2] || "2204",
-          hospitalName: config.hospitalName,
-        });
+        setRoomLookup(null);
+        setLookupError(`Room code "${activeCode}" not found. Please scan a valid door QR code or contact facility administration.`);
+      })
+      .finally(() => {
+        setLookupLoading(false);
       });
-  }, [activeCode, config.hospitalName]);
+  }, [activeCode]);
 
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -121,55 +133,105 @@ export function PublicReportPage() {
 
       {/* Main Content Area */}
       <main className="w-full max-w-xl px-4 py-6 sm:py-8 space-y-6 page-enter">
-        {/* QR Location Banner */}
-        <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-surface to-accent/5 p-5 shadow-card relative overflow-hidden">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
-                <MapPin className="h-3.5 w-3.5" />
-                Verified Facility Location
-              </div>
-              <h2 className="mt-1 text-xl font-bold text-text-primary">
-                {roomLookup ? `Room ${roomLookup.roomNumber || activeCode}` : activeCode}
-              </h2>
-              <p className="mt-0.5 text-sm text-text-muted">
-                {roomLookup?.block || "Block B"} · {roomLookup?.floor || "Floor 1"} · {config.hospitalName}
-              </p>
+        {/* Room Lookup / Verification State */}
+        {!activeCode ? (
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-raised space-y-4">
+            <div className="flex items-center gap-2 text-primary font-bold text-lg">
+              <QrCode className="h-5 w-5" /> Enter Facility Room Code
             </div>
-            <div className="rounded-xl border border-border bg-surface px-3 py-1.5 text-center shadow-sm">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-text-disabled">Room Code</span>
-              <span className="font-mono text-xs font-bold text-primary">{activeCode}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Submitted Confirmation State */}
-        {submitted ? (
-          <div className="rounded-2xl border border-success/30 bg-surface p-8 text-center shadow-raised space-y-4 animate-scale-in">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-success-bg text-success shadow-sm">
-              <CheckCircle2 className="h-10 w-10" />
-            </div>
-            <h3 className="text-2xl font-bold text-text-primary">Alert Sent Successfully</h3>
-            <p className="text-sm text-text-muted max-w-md mx-auto">
-              On-duty cleaning staff assigned to <strong>{roomLookup?.block || "this block"}</strong> have been notified. Thank you for keeping our facility clean and safe.
+            <p className="text-xs text-text-muted">
+              Scan the QR code posted on the room entrance door, or enter the unique Room Code below to report a cleanliness issue.
             </p>
-            <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setSubmitted(false);
-                  setPhotoFile(null);
-                  setPhotoPreview(null);
-                  setComment("");
-                }}
-              >
-                Report Another Issue
-              </Button>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (inputCode.trim()) setActiveCode(inputCode.trim().toUpperCase());
+              }}
+              className="flex gap-2"
+            >
+              <input
+                type="text"
+                placeholder="e.g. CGH-A-101-A"
+                value={inputCode}
+                onChange={(e) => setInputCode(e.target.value)}
+                className="flex-1 rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-mono text-text-primary uppercase outline-none focus:border-primary"
+              />
+              <Button type="submit" size="md">Look Up Room</Button>
+            </form>
+          </div>
+        ) : lookupLoading ? (
+          <div className="rounded-2xl border border-border bg-surface p-8 text-center shadow-card space-y-3">
+            <Loader2 className="h-8 w-8 text-primary animate-spin mx-auto" />
+            <p className="text-xs font-semibold text-text-muted">Verifying room code with facility database...</p>
+          </div>
+        ) : lookupError ? (
+          <div className="rounded-2xl border border-danger/30 bg-danger-bg/30 p-6 text-center shadow-sm space-y-3">
+            <AlertTriangle className="h-8 w-8 text-danger mx-auto" />
+            <h3 className="text-base font-bold text-text-primary">Unregistered Room Code</h3>
+            <p className="text-xs text-text-muted">{lookupError}</p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setActiveCode("");
+                setInputCode("");
+              }}
+            >
+              Enter a Different Room Code
+            </Button>
+          </div>
+        ) : roomLookup ? (
+          /* Verified Room Location Banner */
+          <div className="rounded-2xl border border-primary/20 bg-gradient-to-r from-primary/5 via-surface to-accent/5 p-5 shadow-card relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-primary">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Verified Facility Location
+                </div>
+                <h2 className="mt-1 text-xl font-bold text-text-primary">
+                  Room {roomLookup.roomNumber || roomLookup.roomCode}
+                </h2>
+                <p className="mt-0.5 text-sm text-text-muted">
+                  {roomLookup.block} · {roomLookup.floor} · {roomLookup.hospitalName}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border bg-surface px-3 py-1.5 text-center shadow-sm">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-text-disabled">Room Code</span>
+                <span className="font-mono text-xs font-bold text-primary">{roomLookup.roomCode}</span>
+              </div>
             </div>
           </div>
-        ) : (
-          /* Report Form */
-          <form onSubmit={handleSubmit} className="space-y-6">
+        ) : null}
+
+        {/* Submitted Confirmation or Report Form — Only for valid registered rooms */}
+        {roomLookup && (
+          submitted ? (
+            <div className="rounded-2xl border border-success/30 bg-surface p-8 text-center shadow-raised space-y-4 animate-scale-in">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-success-bg text-success shadow-sm">
+                <CheckCircle2 className="h-10 w-10" />
+              </div>
+              <h3 className="text-2xl font-bold text-text-primary">Alert Sent Successfully</h3>
+              <p className="text-sm text-text-muted max-w-md mx-auto">
+                On-duty cleaning staff assigned to <strong>{roomLookup.block}</strong> have been notified. Thank you for keeping our facility clean and safe.
+              </p>
+              <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSubmitted(false);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                    setComment("");
+                  }}
+                >
+                  Report Another Issue
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* Report Form */
+            <form onSubmit={handleSubmit} className="space-y-6">
             {/* Issue Type Chips */}
             <div className="space-y-3">
               <label className="block text-sm font-semibold text-text-primary">
@@ -249,7 +311,7 @@ export function PublicReportPage() {
               <Send className="h-5 w-5" /> Send Alert to On-Duty Worker
             </Button>
           </form>
-        )}
+        ))}
       </main>
 
       {/* Footer Info */}

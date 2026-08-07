@@ -135,16 +135,7 @@ def get_room_lookup(room_code):
     try:
         lookup = database.get_room_lookup(room_code)
         if not lookup:
-            config = database.get_hospital_config()
-            parts = room_code.split("-")
-            lookup = {
-                "roomCode": room_code,
-                "roomId": "demo-room",
-                "block": parts[1] if len(parts) > 1 else "Block B",
-                "floor": f"Floor {parts[2][0]}" if len(parts) > 2 else "Floor 1",
-                "roomNumber": parts[2] if len(parts) > 2 else "101",
-                "hospitalName": config.get("hospitalName", "City General Hospital"),
-            }
+            return jsonify({"error": "Room code not registered in facility database", "roomLookup": None}), 404
         return jsonify({"roomLookup": lookup}), 200
     except Exception as e:
         return jsonify({"error": f"Failed to lookup room code: {e}"}), 500
