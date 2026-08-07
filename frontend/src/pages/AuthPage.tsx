@@ -72,7 +72,7 @@ export function AuthPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const showDemoPicker = import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
+  const showDemoPicker = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
 
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 

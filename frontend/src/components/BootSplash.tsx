@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -7,10 +8,20 @@ interface BootSplashProps {
 }
 
 export function BootSplash({ message = "Initializing CleanVision...", className }: BootSplashProps) {
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    // Prevent flashing on very fast loads (e.g. fast Suspense resolves)
+    const timer = setTimeout(() => setShow(true), 250);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!show) return null;
+
   return (
     <div
       className={cn(
-        "flex min-h-screen w-full flex-col items-center justify-center bg-bg px-4 transition-colors",
+        "fixed inset-0 z-[9999] flex h-screen w-screen flex-col items-center justify-center bg-bg px-4 transition-colors",
         className
       )}
     >
