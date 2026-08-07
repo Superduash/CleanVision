@@ -2,6 +2,10 @@
 # Local dev files (not for repo)
 # ─────────────────────────────────────────────
 start-all.bat
+landing_p5.tsx
+
+# Old prototype / dataset folder — never commit
+New folder (2)/
 
 # ─────────────────────────────────────────────
 # Training data (local sample images — not tracked)
