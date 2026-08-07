@@ -257,7 +257,7 @@ export function LandingPage() {
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/report" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto gap-2 bg-white text-slate-950 hover:bg-slate-100 active:bg-slate-200 border-transparent shadow-none font-semibold">
+                <Button size="lg" className="w-full sm:w-auto gap-2 bg-white text-[#0A0F1E] hover:bg-[#F0F2F5] active:bg-[#E2E8F0] border-transparent shadow-none font-semibold">
                   <AlertTriangle className="h-5 w-5" />
                   Report a Room Issue
                 </Button>
