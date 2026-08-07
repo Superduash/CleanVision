@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Camera, History, BellRing, ShieldCheck, ArrowRight,
-  TrendingUp, Users, Award, CheckCircle, Plus
+  Camera, History, BellRing, ShieldCheck,
+  TrendingUp, Users, Award, CheckCircle, Plus, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/Button";
 
@@ -138,10 +138,13 @@ export function LandingPage() {
                 becomes an incident report.
               </p>
 
+              {/* Primary CTAs */}
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/signup" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto">
-                    Get Started <ArrowRight className="ml-2 h-5 w-5" />
+                {/* PRIMARY: Patient/Visitor issue report */}
+                <Link to="/report" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Report a Room Issue
                   </Button>
                 </Link>
                 <a href="#how-it-works" className="w-full sm:w-auto">
@@ -150,6 +153,14 @@ export function LandingPage() {
                   </Button>
                 </a>
               </div>
+
+              {/* Secondary: Staff login link */}
+              <p className="mt-5 text-sm text-text-disabled">
+                Hospital staff?{" "}
+                <Link to="/staff/login" className="text-primary hover:underline font-medium">
+                  Sign in to the Staff Portal →
+                </Link>
+              </p>
             </div>
           </div>
         </div>
@@ -238,14 +249,15 @@ export function LandingPage() {
               Deploy CleanVision in minutes. Stop guessing and start validating with AI-powered analytics.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link to="/signup" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full sm:w-auto bg-white text-slate-950 hover:bg-slate-100 active:bg-slate-200 border-transparent shadow-none font-semibold">
-                  Create Free Account
+              <Link to="/report" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto gap-2 bg-white text-slate-950 hover:bg-slate-100 active:bg-slate-200 border-transparent shadow-none font-semibold">
+                  <AlertTriangle className="h-5 w-5" />
+                  Report a Room Issue
                 </Button>
               </Link>
-              <Link to="/login" className="w-full sm:w-auto">
+              <Link to="/staff/login" className="w-full sm:w-auto">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10 active:bg-white/20">
-                  Log in
+                  Staff Login
                 </Button>
               </Link>
             </div>

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { LandingPage } from "@/pages/LandingPage";
 import { PublicReportPage } from "@/pages/PublicReportPage";
 import { AuthPage } from "@/pages/AuthPage";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -47,7 +48,8 @@ function RootRoute() {
     return <Navigate to={roleHomeMap[session.role] || "/dashboard"} replace />;
   }
 
-  return <PublicReportPage />;
+  // Unauthenticated guests see the marketing/landing page
+  return <LandingPage />;
 }
 
 function RoleGuard({
@@ -83,15 +85,18 @@ export function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Root Route: Defaults to Public Patient Report for guests, redirects staff to Dashboard */}
+        {/* Root: Landing page for guests, dashboard redirect for authenticated staff */}
         <Route path="/" element={<RootRoute />} />
+
+        {/* Public QR report page — accessible by room code without login */}
+        <Route path="/report" element={<PublicReportPage />} />
         <Route path="/report/:roomCode" element={<PublicReportPage />} />
 
         {/* Staff Portal Login */}
         <Route path="/staff/login" element={<AuthPage />} />
         <Route path="/login" element={<AuthPage />} />
 
-        {/* Public Pages */}
+        {/* Public Pages (with shared PublicLayout navbar/footer) */}
         <Route element={<PublicLayout />}>
           <Route path="/features" element={<Suspense fallback={<BootSplash />}><FeaturesPage /></Suspense>} />
           <Route path="/docs" element={<Suspense fallback={<BootSplash />}><DocsPage /></Suspense>} />
