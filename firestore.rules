@@ -32,11 +32,19 @@ service cloud.firestore {
       allow write: if isStaff();
     }
 
-    // Public Unauthenticated Visitor Issue Reports — public create allowed
+    // Public Unauthenticated Visitor Issue Reports — public create allowed only for valid room codes
     match /issueReports/{reportId} {
-      allow read: if isStaff();
-      allow create: if true;
-      allow update, delete: if isStaff();
+      allow create: if request.resource.data.roomCode != null &&
+                      exists(/databases/$(database)/documents/roomLookup/$(request.resource.data.roomCode));
+      allow read, update: if isStaff() && (
+        getUserRole() in ['admin', 'manager'] ||
+        (getUserRole() == 'inspector' && (
+          request.auth.token.assignedBlocks == null ||
+          request.auth.token.assignedBlocks.size() == 0 ||
+          request.auth.token.assignedBlocks.hasAny([resource.data.block])
+        ))
+      );
+      allow delete: if isAuthenticated() && (getUserRole() in ['admin', 'manager']);
     }
 
     // Staff Users — readable by staff; writable ONLY by backend service account

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/Button";
 import { PublicNavbar } from "@/components/PublicNavbar";
+import { BootSplash } from "@/components/BootSplash";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Enter your email").email("Enter a valid email"),
@@ -64,7 +65,7 @@ function AuthInput({
 }
 
 export function AuthPage() {
-  const { session, signIn, signInWithGoogle } = useAuth();
+  const { session, isLoading, signIn, signInWithGoogle } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -74,6 +75,10 @@ export function AuthPage() {
   const showDemoPicker = import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
 
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+
+  if (isLoading) {
+    return <BootSplash message="Verifying security credentials..." />;
+  }
 
   if (session) {
     const roleHomeMap: Record<string, string> = {

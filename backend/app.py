@@ -53,12 +53,16 @@ def require_auth(allowed_roles=None):
                 id_token = auth_header.split("Bearer ", 1)[1].strip()
 
             if not id_token:
-                request.auth_user = {
-                    "uid": "dev-user",
-                    "email": "dev@hospital.com",
-                    "role": "admin",
-                    "assignedBlocks": [],
-                }
+                allow_dev = os.environ.get("ALLOW_DEV_AUTH", "false").lower() == "true"
+                if allow_dev:
+                    request.auth_user = {
+                        "uid": "dev-user",
+                        "email": "dev@hospital.com",
+                        "role": "admin",
+                        "assignedBlocks": [],
+                    }
+                else:
+                    return jsonify({"error": "Unauthorized: Missing Bearer token in Authorization header"}), 401
             else:
                 try:
                     decoded = firebase_config.verify_token(id_token)

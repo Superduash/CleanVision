@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import {
@@ -12,7 +12,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { api } from "@/lib/api";
+import { collection, onSnapshot, query, orderBy, limit as fsLimit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { api, Notification } from "@/lib/api";
 import { Button } from "@/components/Button";
 import { cn } from "@/lib/utils";
 
@@ -25,16 +27,55 @@ const FILTER_TABS: { value: string; label: string }[] = [
 
 export function NotificationsPage() {
   const [filter, setFilter] = useState("all");
+  const [liveNotifications, setLiveNotifications] = useState<Notification[]>([]);
+  const [loadingLive, setLoadingLive] = useState(true);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  useEffect(() => {
+    if (!db) {
+      setLoadingLive(false);
+      return;
+    }
+
+    try {
+      const q = query(collection(db, "notifications"), orderBy("createdAt", "desc"), fsLimit(100));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const docs: Notification[] = snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              type: data.type || "alert",
+              title: data.title || "Notification",
+              message: data.message || "",
+              roomId: data.roomId || null,
+              is_read: data.is_read ?? data.isRead ?? false,
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt || new Date().toISOString(),
+            };
+          });
+          setLiveNotifications(docs);
+          setLoadingLive(false);
+        },
+        () => {
+          setLoadingLive(false);
+        }
+      );
+      return unsub;
+    } catch {
+      setLoadingLive(false);
+    }
+  }, []);
+
+  const { data: apiData, isLoading: apiLoading } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api.getNotifications(100),
     refetchInterval: 15_000,
   });
 
-  const notifications = data?.notifications ?? [];
-  const unreadCount = data?.unread_count ?? 0;
+  const notifications = liveNotifications.length > 0 ? liveNotifications : (apiData?.notifications ?? []);
+  const isLoading = liveNotifications.length === 0 && loadingLive && apiLoading;
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const markReadMutation = useMutation({
     mutationFn: (id: string | number) => api.markNotificationRead(id),

@@ -1,40 +1,30 @@
-# CleanVision — Frontend (Phase 1)
+# CleanVision — Hospital Cleanliness Monitoring System (Frontend)
 
-React + Vite + TypeScript + Tailwind frontend for CleanVision, a hospital cleanliness monitoring app.
-This is Phase 1 of a 3-phase rebuild: design system, research-grounded UI, and the three core pages
-(Landing, Login/Signup, Dashboard). See `p2.md` and `p3.md` for the prompts that continue the build in
-an IDE agent (Cursor, Claude Code, etc.) with the backend attached.
+React + Vite + TypeScript + Tailwind frontend for **CleanVision**, an AI-assisted hospital cleanliness monitoring and real-time alert platform.
 
-## What's here
+## Key Features & Architecture
 
-- **Design system** — `src/styles/tokens.css` (color tokens), `tailwind.config.ts` (type scale, tokens
-  wired to Tailwind), Space Grotesk / Inter / IBM Plex Mono loaded in `index.html`.
-- **Signature element** — `ScoreRing`, a circular gauge used in the hero, room cards, and auth panel.
-  The accent violet is a deliberate nod to the blue-violet glow of hospital germicidal (UV-C) lamps —
-  see the comment at the top of `tokens.css`.
-- **Pages** — `LandingPage`, `AuthPage` (login/signup), `DashboardPage`, plus a `ComingSoonPage` stub for
-  the three nav destinations (`/dashboard/scan`, `/dashboard/history`, `/dashboard/settings`) that Phase
-  2 builds out fully — they're wired into navigation now, not dead links.
-- **API client** — `src/lib/api.ts`, typed against the actual attached Flask backend's routes and
-  response shapes (rooms, scan, history, reports/summary, health), with a "waking up the server" toast
-  for Render's cold-start delay.
-- **Auth** — `src/hooks/useAuth.ts` is a clearly-flagged local-only session, because the attached backend
-  has no auth endpoints yet. Phase 2 replaces this once real endpoints exist.
+- **Single-Hospital Deployment Model**: Driven by a singleton `hospitalConfig` hook and API (`useHospitalConfig.ts`). No multi-tenant complexity or `orgId` required.
+- **Dual Theme System ("Laboratory White" / "Monitor Glow")**: Full semantic token palette in `src/styles/tokens.css` with persistent theme switching and anti-flash synchronous initialization.
+- **Role-Based Staff Access (Firebase Auth & Custom Claims)**:
+  - `admin`: Full hospital setup, config management, and Manager account creation.
+  - `manager`: Room QR generation, Inspector account creation, and hospital-wide alert management.
+  - `inspector`: Room scanning flow, history, and block-filtered live alerts.
+- **Public Patient Reporting (Unauthenticated Flow)**: `/report/:roomCode` allows visitors and patients to submit cleanliness issues with optional photos, backed by real-time Firestore listeners (`onSnapshot`).
+- **AI Scanning Viewfinder**: Interactive camera scanning and cleanliness score evaluation interface (`/dashboard/scan`).
+- **Real-Time Live Feed**: Firestore `onSnapshot` integration in `NotificationsPage.tsx` and `CleaningRequestsPage.tsx` for instant alert dispatch without manual reloads.
 
-## Running locally
+## Running Locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-The dev server proxies `/api/*` to `http://localhost:5000` (see `vite.config.ts`), so run the Flask
-backend locally alongside it. For a deployed backend instead, set `VITE_API_BASE_URL` — see
-`.env.example`.
+The dev server proxies `/api/*` requests to `http://localhost:5000` (see `vite.config.ts`). Run the Flask backend alongside it or set `VITE_API_BASE_URL` for remote deployments.
 
-## Known gaps going into Phase 2
+## Environment Variables
 
-- Dark mode is not implemented yet — `darkMode: "class"` is wired into `tailwind.config.ts` and
-  `tokens.css` has a comment marking where the `.dark` block goes.
-- `/dashboard/scan`, `/dashboard/history`, `/dashboard/settings` are placeholder pages.
-- Auth is local-only (see above).
+- `VITE_API_BASE_URL`: Base URL for the Flask backend (defaults to relative `/api`).
+- `VITE_SHOW_DEMO_ACCOUNTS`: Set to `"true"` to enable tap-to-fill demo logins on `/staff/login` (defaults to `"false"`).
+- `VITE_SHOW_QR_SIMULATOR`: Set to `"true"` to show the QR code simulator on public report pages (defaults to `"false"`).
