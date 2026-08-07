@@ -3,6 +3,7 @@
 # ─────────────────────────────────────────────
 start-all.bat
 landing_p5.tsx
+old_friend/
 
 # Old prototype / dataset folder — never commit
 New folder (2)/

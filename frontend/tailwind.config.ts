@@ -85,6 +85,10 @@ export default {
           from: { height: "var(--radix-accordion-content-height, auto)", opacity: "1" },
           to: { height: "0", opacity: "0" },
         },
+        "pulse-subtle": {
+          "0%, 100%": { transform: "scale(0.95)", opacity: "0.5" },
+          "50%": { transform: "scale(1.1)", opacity: "0.1" },
+        },
       },
       animation: {
         "ring-sweep": "ring-sweep 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards",
@@ -94,6 +98,7 @@ export default {
         "float":      "float 6s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-subtle": "pulse-subtle 2s infinite ease-out",
       },
     },
   },
