@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
-  ShieldCheck,
   Camera,
   CheckCircle2,
   Send,
-  LogIn,
   QrCode,
   MapPin,
 } from "lucide-react";
@@ -105,42 +103,21 @@ export function PublicReportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-text-primary flex flex-col items-center justify-between pb-12">
-      {/* Top Header Navigation */}
-      <header className="w-full border-b border-border/60 bg-surface/80 glass sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-white shadow-sm">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <span className="font-bold text-base tracking-tight text-text-primary">
-              {config.hospitalName}
-            </span>
-            <span className="hidden sm:inline-block ml-2 rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
-              Quality Assurance
-            </span>
-          </div>
-        </div>
+    <div className="flex flex-col items-center pb-16 min-h-[calc(100vh-4rem)]">
 
-        <div className="flex items-center gap-2">
-          {showDemoSimulator && (
-            <button
-              onClick={() => setShowSimulator(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-warning/40 bg-warning-bg px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
-              title="Simulate Door QR Scan"
-            >
-              <QrCode className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Simulate QR</span>
-            </button>
-          )}
-
-          <Link to="/staff/login">
-            <Button size="sm" variant="secondary" className="gap-1.5 text-xs">
-              <LogIn className="h-3.5 w-3.5 text-primary" /> Staff Login
-            </Button>
-          </Link>
+      {/* QR Simulator trigger — shown in content if enabled */}
+      {showDemoSimulator && (
+        <div className="w-full max-w-xl px-4 pt-4">
+          <button
+            onClick={() => setShowSimulator(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-warning/40 bg-warning-bg px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
+            title="Simulate Door QR Scan"
+          >
+            <QrCode className="h-3.5 w-3.5" />
+            Simulate QR Scan
+          </button>
         </div>
-      </header>
+      )}
 
       {/* Main Content Area */}
       <main className="w-full max-w-xl px-4 py-6 sm:py-8 space-y-6 page-enter">

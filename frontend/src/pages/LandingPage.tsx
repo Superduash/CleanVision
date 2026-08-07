@@ -5,6 +5,8 @@ import {
   TrendingUp, Users, Award, CheckCircle, Plus, AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/Button";
+import { PublicNavbar } from "@/components/PublicNavbar";
+import { Footer } from "@/components/Footer";
 
 const FEATURES = [
   {
@@ -113,7 +115,9 @@ import { cn } from "@/lib/utils";
 
 export function LandingPage() {
   return (
-    <div className="flex-1">
+    <div className="min-h-screen bg-bg flex flex-col">
+      <PublicNavbar />
+      <main className="flex-1">
 
       {/* ──────────────────── HERO ──────────────────── */}
       <section className="relative overflow-hidden pt-8 lg:pt-16">
@@ -280,6 +284,8 @@ export function LandingPage() {
         </div>
       </section>
 
+      </main>
+      <Footer />
     </div>
   );
 }

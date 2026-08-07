@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { to: "/features", label: "Features" },
-  { to: "/docs", label: "Docs" },
-  { to: "/api", label: "API" },
+  { to: "/#how-it-works", label: "How it Works" },
+  { to: "/#faq", label: "FAQ" },
   { to: "/contact", label: "Contact" },
 ];
 
@@ -91,8 +91,8 @@ export function PublicNavbar() {
                 <Link to="/staff/login">
                   <Button variant="ghost" size="sm">Log in</Button>
                 </Link>
-                <Link to="/report">
-                  <Button size="sm">Report Issue</Button>
+                <Link to="/staff/login">
+                  <Button size="sm">Get Started</Button>
                 </Link>
               </>
             )}
@@ -167,8 +167,8 @@ export function PublicNavbar() {
                 <Link to="/staff/login" onClick={() => setIsOpen(false)}>
                   <Button variant="secondary" className="w-full" size="lg">Log in</Button>
                 </Link>
-                <Link to="/report" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full" size="lg">Report Issue</Button>
+                <Link to="/staff/login" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full" size="lg">Get Started</Button>
                 </Link>
               </>
             )}

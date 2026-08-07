@@ -12,8 +12,6 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Lazy-load public pages
 const FeaturesPage = lazy(() => import("@/pages/FeaturesPage").then(m => ({ default: m.FeaturesPage })));
-const DocsPage = lazy(() => import("@/pages/DocsPage").then(m => ({ default: m.DocsPage })));
-const ApiReferencePage = lazy(() => import("@/pages/ApiReferencePage").then(m => ({ default: m.ApiReferencePage })));
 const ContactPage = lazy(() => import("@/pages/ContactPage").then(m => ({ default: m.ContactPage })));
 const PrivacyPage = lazy(() => import("@/pages/PrivacyPage").then(m => ({ default: m.PrivacyPage })));
 const TermsPage = lazy(() => import("@/pages/TermsPage").then(m => ({ default: m.TermsPage })));
@@ -88,19 +86,18 @@ export function App() {
         {/* Root: Landing page for guests, dashboard redirect for authenticated staff */}
         <Route path="/" element={<RootRoute />} />
 
-        {/* Public QR report page — accessible by room code without login */}
-        <Route path="/report" element={<PublicReportPage />} />
-        <Route path="/report/:roomCode" element={<PublicReportPage />} />
-
         {/* Staff Portal Login */}
         <Route path="/staff/login" element={<AuthPage />} />
         <Route path="/login" element={<AuthPage />} />
 
-        {/* Public Pages (with shared PublicLayout navbar/footer) */}
+        {/* All public pages share the navbar + footer via PublicLayout */}
         <Route element={<PublicLayout />}>
+          {/* Public QR report page — accessible by room code without login */}
+          <Route path="/report" element={<Suspense fallback={<BootSplash />}><PublicReportPage /></Suspense>} />
+          <Route path="/report/:roomCode" element={<Suspense fallback={<BootSplash />}><PublicReportPage /></Suspense>} />
+
+          {/* Marketing / info pages */}
           <Route path="/features" element={<Suspense fallback={<BootSplash />}><FeaturesPage /></Suspense>} />
-          <Route path="/docs" element={<Suspense fallback={<BootSplash />}><DocsPage /></Suspense>} />
-          <Route path="/api" element={<Suspense fallback={<BootSplash />}><ApiReferencePage /></Suspense>} />
           <Route path="/contact" element={<Suspense fallback={<BootSplash />}><ContactPage /></Suspense>} />
           <Route path="/privacy" element={<Suspense fallback={<BootSplash />}><PrivacyPage /></Suspense>} />
           <Route path="/terms" element={<Suspense fallback={<BootSplash />}><TermsPage /></Suspense>} />
