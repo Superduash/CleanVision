@@ -142,8 +142,11 @@ export function LandingPage() {
               <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                 {/* PRIMARY: Patient/Visitor issue report */}
                 <Link to="/report" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto gap-2">
-                    <AlertTriangle className="h-5 w-5" />
+                  <Button
+                    size="lg"
+                    className="w-full sm:w-auto gap-2 bg-[#0D6EFD] text-white hover:bg-[#0B5ED7] active:bg-[#094EB1] border-transparent"
+                  >
+                    <AlertTriangle className="h-5 w-5 text-white" />
                     Report a Room Issue
                   </Button>
                 </Link>

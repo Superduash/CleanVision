@@ -88,11 +88,11 @@ export function PublicNavbar() {
               </Link>
             ) : (
               <>
-                <Link to="/login">
+                <Link to="/staff/login">
                   <Button variant="ghost" size="sm">Log in</Button>
                 </Link>
-                <Link to="/signup">
-                  <Button size="sm">Get started</Button>
+                <Link to="/report">
+                  <Button size="sm">Report Issue</Button>
                 </Link>
               </>
             )}
@@ -164,11 +164,11 @@ export function PublicNavbar() {
               </Link>
             ) : (
               <>
-                <Link to="/login" onClick={() => setIsOpen(false)}>
+                <Link to="/staff/login" onClick={() => setIsOpen(false)}>
                   <Button variant="secondary" className="w-full" size="lg">Log in</Button>
                 </Link>
-                <Link to="/signup" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full" size="lg">Get started</Button>
+                <Link to="/report" onClick={() => setIsOpen(false)}>
+                  <Button className="w-full" size="lg">Report Issue</Button>
                 </Link>
               </>
             )}

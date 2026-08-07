@@ -1,0 +1,422 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* Common variables */
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-info: #0284c7;
+  --color-info-bg: rgba(2, 132, 199, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Light Theme Variables */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  --bg-accent-light: #e0f2fe;
+  --bg-accent-gradient: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  --bg-accent-glow: rgba(2, 132, 199, 0.2);
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-on-accent: #ffffff;
+  
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --border-color: #e2e8f0;
+  
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 8px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-backdrop: blur(16px);
+  --simulator-bg: #e2e8f0;
+}
+
+[data-theme="dark"] {
+  /* Dark Theme Variables */
+  --bg-primary: #0b0f19;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --bg-accent-light: rgba(56, 189, 248, 0.1);
+  --bg-accent-gradient: linear-gradient(135deg, #0284c7 0%, #0c4a6e 100%);
+  --bg-accent-glow: rgba(56, 189, 248, 0.25);
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-on-accent: #ffffff;
+  
+  --primary: #38bdf8;
+  --primary-hover: #7dd3fc;
+  --border-color: #374151;
+  
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 20px -2px rgba(0, 0, 0, 0.3), 0 2px 8px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  
+  --card-bg: rgba(17, 24, 39, 0.8);
+  --card-backdrop: blur(16px);
+  --simulator-bg: #030712;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  min-height: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  transition: background-color var(--transition-normal);
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Print Styling for PDF Export */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+  }
+  .app-simulator, .simulator-chrome, .nav-bar, .no-print {
+    display: none !important;
+  }
+  .print-report-container {
+    display: block !important;
+    width: 100% !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+}
+
+/* APP WRAPPER - Full website layout */
+.app-simulator-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  transition: background var(--transition-normal);
+}
+
+/* No phone frame - just a full-width content container */
+.app-simulator {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-primary);
+  transition: background-color var(--transition-normal);
+}
+
+/* Hide phone chrome elements */
+.simulator-notch,
+.simulator-status-bar,
+.simulator-home-indicator,
+.ambient-glow-circle {
+  display: none !important;
+}
+
+/* MAIN SCREEN PORT - full page */
+.app-screen-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  position: relative;
+  min-height: 0;
+}
+
+/* Scrollbar */
+.app-screen-container::-webkit-scrollbar {
+  width: 6px;
+}
+.app-screen-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+.app-screen-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 
+  Website layout: 
+  - Headers (nav bars) stretch full width with a sticky top bar style
+  - Inner header content is also capped at 1100px to align with body content
+  - Scrollable body content gets a readable max-width and centers
+*/
+
+/* Full-width sticky top nav bars — content aligned to same max-width as body */
+.client-header,
+.screen-header,
+.history-header,
+.report-detail-header,
+.results-header,
+.settings-header,
+.reports-header {
+  width: 100%;
+  box-sizing: border-box;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: var(--shadow-sm);
+  /* Align inner content to body max-width */
+  padding-left: max(24px, calc((100vw - 1100px) / 2)) !important;
+  padding-right: max(24px, calc((100vw - 1100px) / 2)) !important;
+}
+
+/* Search filter bar stacks just below history-header */
+.search-filter-container {
+  width: 100%;
+  box-sizing: border-box;
+  position: sticky;
+  top: 56px;
+  z-index: 49;
+  box-shadow: var(--shadow-sm);
+  padding-left: max(24px, calc((100vw - 1100px) / 2)) !important;
+  padding-right: max(24px, calc((100vw - 1100px) / 2)) !important;
+}
+
+/* Body/scroll areas inside each screen — centered with max-width */
+.client-scroll-body,
+.dashboard-container,
+.history-list-scroll,
+.report-detail-scroll,
+.scan-content-scroll,
+.results-content-scroll,
+.settings-content-scroll,
+.reports-content-scroll,
+.processing-screen {
+  max-width: 1100px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+/* Full-height screen containers so background fills page */
+.client-screen,
+.history-screen,
+.report-detail-screen,
+.results-screen,
+.settings-screen,
+.reports-screen,
+.scan-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Login screen — centered card layout */
+.login-screen {
+  max-width: 520px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Splash screen — full viewport, centered content */
+.splash-screen {
+  background-color: var(--bg-primary);
+}
+
+/* COMMON GLASS CARDS & UI COMPONENTS */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: var(--card-backdrop);
+  -webkit-backdrop-filter: var(--card-backdrop);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+
+.glass-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--primary);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-radius: 16px;
+  border: none;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--bg-accent-gradient);
+  color: var(--text-on-accent);
+  box-shadow: 0 4px 12px var(--bg-accent-glow);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px var(--bg-accent-glow);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--border-color);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.btn-outline:hover {
+  background: var(--bg-accent-light);
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--bg-accent-glow);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.8; }
+}
+
+@keyframes scanLine {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+
+@keyframes wave {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 0.1; }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.animate-fade {
+  animation: fadeIn var(--transition-normal) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp var(--transition-normal) forwards;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge-very-clean {
+  background-color: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.badge-clean {
+  background-color: var(--color-info-bg);
+  color: #3b82f6;
+}
+
+.badge-attention {
+  background-color: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.badge-dirty {
+  background-color: var(--color-danger-bg);
+  color: var(--color-danger);
+}
