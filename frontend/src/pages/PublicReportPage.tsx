@@ -8,12 +8,15 @@ import {
   MapPin,
   AlertTriangle,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 import { api, RoomLookup } from "@/lib/api";
 import { Button } from "@/components/Button";
+import { QRScanner } from "@/components/QRScanner";
 import { cn } from "@/lib/utils";
+import { Html5Qrcode } from "html5-qrcode";
 
 const ISSUE_CHIPS = [
   "Wet Floor & Water Spill",
@@ -44,8 +47,30 @@ export function PublicReportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [showSimulator, setShowSimulator] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [isScanningFile, setIsScanningFile] = useState(false);
 
   const showDemoSimulator = import.meta.env.VITE_SHOW_QR_SIMULATOR === "true";
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningFile(true);
+    const html5QrCode = new Html5Qrcode("qr-reader-dummy");
+    html5QrCode.scanFile(file, true)
+      .then(decodedText => {
+        setActiveCode(decodedText.trim().toUpperCase());
+        toast.success("QR Code uploaded successfully!");
+      })
+      .catch(err => {
+        toast.error("Could not find a valid QR code in the image.");
+      })
+      .finally(() => {
+        setIsScanningFile(false);
+        html5QrCode.clear().catch(() => {});
+      });
+  };
 
   // Fetch public room lookup for active room code
   useEffect(() => {
@@ -147,16 +172,45 @@ export function PublicReportPage() {
                 e.preventDefault();
                 if (inputCode.trim()) setActiveCode(inputCode.trim().toUpperCase());
               }}
-              className="flex gap-2"
+              className="flex flex-col gap-3"
             >
-              <input
-                type="text"
-                placeholder="e.g. CGH-A-101-A"
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value)}
-                className="flex-1 rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-mono text-text-primary uppercase outline-none focus:border-primary"
-              />
-              <Button type="submit" size="md">Look Up Room</Button>
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  size="lg" 
+                  className="flex-1 gap-2 shadow-raised bg-accent hover:bg-accent-hover text-white py-3.5"
+                  onClick={() => setShowQRScanner(true)}
+                >
+                  <QrCode className="h-5 w-5" /> Scan QR
+                </Button>
+
+                <label className="flex-1 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-3.5 text-sm font-bold text-text-primary shadow-raised transition-all hover:bg-highlight">
+                  {isScanningFile ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Upload className="h-5 w-5 text-primary" />
+                  )}
+                  Upload QR
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+                </label>
+              </div>
+              <div id="qr-reader-dummy" className="hidden"></div>
+              
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-surface px-2 text-text-disabled">Or enter manually</span></div>
+              </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="e.g. CGH-A-101-A"
+                  value={inputCode}
+                  onChange={(e) => setInputCode(e.target.value)}
+                  className="flex-1 rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-mono text-text-primary uppercase outline-none focus:border-primary"
+                />
+                <Button type="submit" size="md">Look Up</Button>
+              </div>
             </form>
           </div>
         ) : lookupLoading ? (
@@ -311,7 +365,8 @@ export function PublicReportPage() {
               <Send className="h-5 w-5" /> Send Alert to On-Duty Worker
             </Button>
           </form>
-        ))}
+          )
+        )}
       </main>
 
       {/* Footer Info */}
@@ -356,6 +411,18 @@ export function PublicReportPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Live QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          onClose={() => setShowQRScanner(false)}
+          onScan={(decodedText) => {
+            setActiveCode(decodedText.trim().toUpperCase());
+            setShowQRScanner(false);
+            toast.success("QR Code scanned successfully!");
+          }}
+        />
       )}
     </div>
   );

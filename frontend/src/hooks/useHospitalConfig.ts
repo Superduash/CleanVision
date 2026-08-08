@@ -1,6 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { api } from "@/lib/api";
 
 export interface HospitalConfig {
@@ -28,50 +26,21 @@ export function useHospitalConfig() {
   const query = useQuery<HospitalConfig>({
     queryKey: ["hospital-config"],
     queryFn: async () => {
-      // 1. Try Firestore client read
-      try {
-        if (db) {
-          const docRef = doc(db, "hospitalConfig", "main");
-          const snap = await getDoc(docRef);
-          if (snap.exists()) {
-            return snap.data() as HospitalConfig;
-          }
-        }
-      } catch (err) {
-        console.warn("Firestore hospitalConfig read failed, falling back to backend API:", err);
-      }
-
-      // 2. Fallback to backend endpoint
+      // Backend handles Firestore read server-side — no need for client-side Firestore call
       try {
         const res = await api.getHospitalConfig();
-        if (res?.config) return res.config;
+        if (res?.config) return res.config as HospitalConfig;
       } catch {}
-
       return DEFAULT_HOSPITAL_CONFIG;
     },
-    staleTime: 60_000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,  // 10 min: hospital config rarely changes
+    gcTime: 60 * 60 * 1000,     // 60 min in memory
+    placeholderData: () => DEFAULT_HOSPITAL_CONFIG,
   });
 
   const updateMutation = useMutation({
     mutationFn: async (updated: Partial<HospitalConfig>) => {
-      // Send write through backend endpoint to ensure server authorization
       await api.updateHospitalConfig(updated);
-
-      // Also mirror to local Firestore if available
-      try {
-        if (db) {
-          const docRef = doc(db, "hospitalConfig", "main");
-          await setDoc(
-            docRef,
-            {
-              ...updated,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
-        }
-      } catch {}
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hospital-config"] });

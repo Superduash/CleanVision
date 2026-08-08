@@ -54,7 +54,7 @@ def require_auth(allowed_roles=None):
 
             if not id_token:
                 allow_dev = os.environ.get("ALLOW_DEV_AUTH", "false").lower() == "true"
-                if allow_dev:
+                if allow_dev or not firebase_config.get_db():
                     request.auth_user = {
                         "uid": "dev-user",
                         "email": "dev@hospital.com",
@@ -63,6 +63,28 @@ def require_auth(allowed_roles=None):
                     }
                 else:
                     return jsonify({"error": "Unauthorized: Missing Bearer token in Authorization header"}), 401
+            elif id_token.startswith("LOCAL_"):
+                # Handle local mock auth token sent by frontend (e.g. LOCAL_inspector)
+                if not firebase_config.get_db() or os.environ.get("ALLOW_DEV_AUTH", "false").lower() == "true":
+                    # "LOCAL_" is 6 chars — everything after that is the role
+                    role_part = id_token[6:] if len(id_token) > 6 else "admin"
+                    # Normalize role names: frontend sends role as stored in session
+                    role_map = {
+                        "admin": "admin",
+                        "supervisor": "manager",
+                        "manager": "manager",
+                        "inspector": "inspector",
+                        "staff": "inspector",
+                    }
+                    role = role_map.get(role_part.lower(), "inspector")
+                    request.auth_user = {
+                        "uid": "dev-user",
+                        "email": "dev@hospital.com",
+                        "role": role,
+                        "assignedBlocks": [],
+                    }
+                else:
+                    return jsonify({"error": "Unauthorized: Local mock token not allowed in production"}), 401
             else:
                 try:
                     decoded = firebase_config.verify_token(id_token)
@@ -308,7 +330,6 @@ def create_room():
 
 @app.route("/api/rooms", methods=["GET"])
 @require_auth()
-@cache.cached(timeout=15, query_string=True)
 def get_rooms():
     try:
         block = request.args.get("block")
@@ -458,7 +479,6 @@ def delete_scan(scan_id):
 
 @app.route("/api/reports/summary", methods=["GET"])
 @require_auth()
-@cache.cached(timeout=60, query_string=True)
 def reports_summary():
     try:
         days = request.args.get("days", default=7, type=int)
@@ -520,4 +540,4 @@ def serve_upload(filename):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)

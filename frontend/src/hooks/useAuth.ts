@@ -91,8 +91,15 @@ async function buildSession(user: User): Promise<Session> {
 }
 
 export function useProvideAuth(): AuthContextValue {
-  const [session, setSession] = useState<Session | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [session, setSession] = useState<Session | null>(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -151,12 +158,16 @@ export function useProvideAuth(): AuthContextValue {
     }
 
     // Local Fallback Login for Staff
+    let mockRole: UserRole = "admin";
+    if (email.toLowerCase().includes("manager") || email.toLowerCase().includes("supervisor")) mockRole = "manager";
+    if (email.toLowerCase().includes("inspector") || email.toLowerCase().includes("staff") || email.toLowerCase().includes("worker")) mockRole = "inspector";
+
     const localSession: Session = {
       uid: "local-" + Date.now(),
       name: email.split("@")[0] || "Staff",
       email,
-      role: "admin",
-      assignedBlocks: [],
+      role: mockRole,
+      assignedBlocks: mockRole === "inspector" ? ["Block A"] : [],
       photoURL: null,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localSession));

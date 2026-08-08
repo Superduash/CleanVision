@@ -107,7 +107,7 @@ export function DashboardPage() {
   const cleanCount = summary?.status_counts?.clean ?? safeRooms.filter((r) => r.latest_status === "clean").length;
   const needsCount = summary?.status_counts?.needs_attention ?? safeRooms.filter((r) => r.latest_status === "needs_attention").length;
   const dirtyCount = summary?.status_counts?.dirty ?? safeRooms.filter((r) => r.latest_status === "dirty").length;
-  const avgScore = summary?.avg_score_today ?? 85.4;
+  const avgScore = summary?.avg_score_today ?? 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 page-enter space-y-6 sm:space-y-8">

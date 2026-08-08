@@ -47,6 +47,7 @@ backend/.venv/
 # Database
 # ─────────────────────────────────────────────
 backend/database.db
+backend/local_db.json
 
 # ─────────────────────────────────────────────
 # Uploaded images (keep .gitkeep sentinel files)
@@ -62,6 +63,7 @@ backend/uploads/scans/*
 backend/cleanliness_model.h5
 backend/*.h5
 *.h5
+!backend/cleanliness_model.h5
 *.pb
 *.tflite
 

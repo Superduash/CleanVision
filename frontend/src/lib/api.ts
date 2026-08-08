@@ -123,29 +123,72 @@ export class ApiError extends Error {
   }
 }
 
-const COLD_START_NOTICE_MS = 5_000;
+// Only show "Waking up server" toast on Render/production deployments (not localhost)
+const IS_LOCALHOST = typeof window !== "undefined" && (
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1"
+);
+const COLD_START_NOTICE_MS = IS_LOCALHOST ? 999_999 : 12_000;
+
+// Cache auth header to avoid async overhead per request
+let _cachedAuthHeader: Record<string, string> | null = null;
+let _authCacheExpiry = 0;
 
 async function getAuthHeader(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (_cachedAuthHeader && now < _authCacheExpiry) {
+    return _cachedAuthHeader;
+  }
+
   if (auth && auth.currentUser) {
     try {
       const token = await auth.currentUser.getIdToken();
-      return { Authorization: `Bearer ${token}` };
+      _cachedAuthHeader = { Authorization: `Bearer ${token}` };
+      _authCacheExpiry = now + 55 * 60 * 1000; // cache 55 min (tokens valid 1hr)
+      return _cachedAuthHeader;
     } catch {
-      return {};
+      // Fall through to local check if token refresh fails
     }
+  }
+
+  // Local fallback mock auth — sync read, no async needed
+  const saved = localStorage.getItem("cleanvision.staff_session");
+  if (saved) {
+    try {
+      const session = JSON.parse(saved);
+      if (session.uid && (session.uid.startsWith("local-") || session.uid.startsWith("google-local-"))) {
+        _cachedAuthHeader = { Authorization: `Bearer LOCAL_${session.role}` };
+        _authCacheExpiry = now + 60 * 60 * 1000;
+        return _cachedAuthHeader;
+      }
+    } catch {}
   }
   return {};
 }
 
+// Invalidate cached auth on logout/role change
+export function invalidateAuthCache() {
+  _cachedAuthHeader = null;
+  _authCacheExpiry = 0;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const coldStartTimer = setTimeout(() => {
-    toast.message("Waking up the server…", {
-      description:
-        "The backend was idle and is starting back up. This can take up to a minute.",
-      duration: 10_000,
-      id: "cold-start",
-    });
-  }, COLD_START_NOTICE_MS);
+  let coldStartTimer: ReturnType<typeof setTimeout> | null = null;
+
+  if (!IS_LOCALHOST) {
+    coldStartTimer = setTimeout(() => {
+      toast.message("Waking up the server…", {
+        description: "The backend was idle and is starting back up. This can take up to a minute.",
+        duration: 10_000,
+        id: "cold-start",
+      });
+    }, COLD_START_NOTICE_MS);
+  }
+
+  const cleanup = () => {
+    if (coldStartTimer) clearTimeout(coldStartTimer);
+    toast.dismiss("cold-start");
+  };
 
   try {
     const authHeaders = await getAuthHeader();
@@ -158,8 +201,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
 
-    clearTimeout(coldStartTimer);
-    toast.dismiss("cold-start");
+    cleanup();
 
     if (!res.ok) {
       let message = `Request failed (${res.status})`;
@@ -173,8 +215,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     if (res.status === 204) return undefined as T;
     return (await res.json()) as T;
   } catch (err) {
-    clearTimeout(coldStartTimer);
-    toast.dismiss("cold-start");
+    cleanup();
     if (err instanceof ApiError) throw err;
     throw new ApiError(
       "Couldn't reach the server. Check your connection and try again.",

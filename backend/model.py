@@ -4,6 +4,7 @@ Handles AI model loading, MobileNetV2 input preprocessing, isotonic probability 
 and status threshold mapping.
 
 Falls back to deterministic mock mode if cleanliness_model.h5 is not present.
+Lazy loads TensorFlow on demand so server startup is instantaneous.
 """
 
 import hashlib
@@ -13,15 +14,29 @@ import os
 MOCK_MODE: bool = True
 _model = None
 _calibrator = None
+_model_attempted_load: bool = False
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "cleanliness_model.h5")
 CALIBRATOR_PATH = os.path.join(os.path.dirname(__file__), "calibrator.pkl")
 
-try:
-    import tensorflow as tf
-    from tensorflow import keras  # noqa: F401
 
-    if os.path.exists(MODEL_PATH):
+def load_model_if_needed():
+    """Lazy-load MobileNetV2 model and calibrator on demand to keep server startup fast."""
+    global _model, _calibrator, MOCK_MODE, _model_attempted_load
+
+    if _model_attempted_load:
+        return
+
+    _model_attempted_load = True
+
+    if not os.path.exists(MODEL_PATH):
+        print("[CleanVision AI] No trained model found at backend/cleanliness_model.h5 — MOCK MODE active.")
+        MOCK_MODE = True
+        return
+
+    try:
+        print("[CleanVision AI] Loading TensorFlow and MobileNetV2 model...")
+        import tensorflow as tf
         _model = tf.keras.models.load_model(MODEL_PATH)
         MOCK_MODE = False
         print("[CleanVision AI] Trained MobileNetV2 model loaded successfully.")
@@ -33,15 +48,16 @@ try:
             print("[CleanVision AI] Isotonic probability calibrator loaded successfully.")
         else:
             print("[CleanVision AI] Calibrator file calibrator.pkl not found — using direct sigmoid mapping.")
-    else:
-        print(
-            "[CleanVision AI] No trained model found — running in MOCK MODE.\n"
-            "Predictions are hash-based and stable for local UI testing.\n"
-            "Drop cleanliness_model.h5 (and calibrator.pkl) into backend/ and restart for real AI."
-        )
-except Exception as exc:
-    print(f"[CleanVision AI] Model load error: {exc}")
-    print("[CleanVision AI] Running in MOCK MODE — hash-based testing fallback active.")
+    except Exception as exc:
+        print(f"[CleanVision AI] Model load error: {exc}")
+        print("[CleanVision AI] Running in MOCK MODE fallback.")
+        MOCK_MODE = True
+
+
+# Check if model file exists without loading TensorFlow yet
+if os.path.exists(MODEL_PATH):
+    MOCK_MODE = False
+else:
     MOCK_MODE = True
 
 
@@ -50,21 +66,7 @@ except Exception as exc:
 # --------------------------------------------------------------------------- #
 
 def get_status(score: float) -> str:
-    """
-    Map a 0.0–100.0 cleanliness score to a facility operational status string.
-
-    Production Score Bands:
-        90.0 – 100.0 → 'clean' (Excellent)
-        75.0 – 89.9  → 'clean' (Satisfactory)
-        55.0 – 74.9  → 'needs_attention' (Moderate Grime / Re-check)
-        30.0 – 54.9  → 'dirty' (Unsanitary / Action Required)
-         0.0 – 29.9  → 'dirty' (Critical / Urgent Sanitation)
-
-    API Status String Mapping:
-        >= 75.0 → 'clean'
-        55.0 – 74.9 → 'needs_attention'
-        < 55.0  → 'dirty'
-    """
+    """Map a 0.0–100.0 cleanliness score to a facility operational status string."""
     if score >= 75.0:
         return "clean"
     if score >= 55.0:
@@ -73,12 +75,7 @@ def get_status(score: float) -> str:
 
 
 def calculate_score(pred_raw: float) -> float:
-    """
-    Calculate a calibrated 0.0–100.0 cleanliness score from raw sigmoid P(dirty).
-
-    1. Applies Isotonic Regression probability calibration if calibrator is loaded.
-    2. Maps calibrated P(dirty) to Cleanliness Score = (1 - P(dirty)) * 100.
-    """
+    """Calculate a calibrated 0.0–100.0 cleanliness score from raw sigmoid P(dirty)."""
     if _calibrator is not None:
         try:
             pred_calibrated = float(_calibrator.predict([pred_raw])[0])
@@ -96,17 +93,9 @@ def calculate_score(pred_raw: float) -> float:
 # --------------------------------------------------------------------------- #
 
 def predict(image_path: str) -> dict:
-    """
-    Return a cleanliness prediction for an image file.
-
-    Returns:
-        {
-            "score":  float   — 0.0–100.0, one decimal place
-            "status": str     — 'clean' | 'needs_attention' | 'dirty'
-            "mock":   bool    — True when running in mock mode
-        }
-    """
-    if MOCK_MODE:
+    """Return a cleanliness prediction for an image file."""
+    load_model_if_needed()
+    if MOCK_MODE or _model is None:
         return _mock_predict(image_path)
     return _real_predict(image_path)
 
@@ -129,7 +118,7 @@ def _real_predict(image_path: str) -> dict:
 
     img = Image.open(image_path).convert("RGB")
     img = img.resize((224, 224), Image.LANCZOS)
-    
+
     # MobileNetV2 Preprocessing: (x / 127.5) - 1.0 -> maps [0, 255] to [-1, 1]
     arr = (np.array(img, dtype="float32") / 127.5) - 1.0
     img_array = np.expand_dims(arr, axis=0)

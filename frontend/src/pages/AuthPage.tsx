@@ -73,8 +73,9 @@ export function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const showDemoPicker = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true";
-
   const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
+
+  const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
 
   if (isLoading) {
     return <BootSplash message="Verifying security credentials..." />;
@@ -88,8 +89,6 @@ export function AuthPage() {
     };
     return <Navigate to={roleHomeMap[session.role] || "/dashboard"} replace />;
   }
-
-  const form = useForm<LoginValues>({ resolver: zodResolver(loginSchema) });
 
   const onLogin = async (values: LoginValues) => {
     setIsSubmitting(true);
@@ -143,17 +142,17 @@ export function AuthPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => fillDemoAccount("manager@hospital.com", "Manager")}
+                  onClick={() => fillDemoAccount("supervisor@hospital.com", "Supervisor")}
                   className="rounded-lg border border-warning/30 bg-surface px-2 py-1.5 text-center text-xs font-semibold text-text-primary hover:border-warning"
                 >
-                  Manager
+                  Supervisor
                 </button>
                 <button
                   type="button"
-                  onClick={() => fillDemoAccount("inspector@hospital.com", "Inspector")}
+                  onClick={() => fillDemoAccount("staff@hospital.com", "Staff Worker")}
                   className="rounded-lg border border-warning/30 bg-surface px-2 py-1.5 text-center text-xs font-semibold text-text-primary hover:border-warning"
                 >
-                  Inspector
+                  Staff/Worker
                 </button>
               </div>
             </div>

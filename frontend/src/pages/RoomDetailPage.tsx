@@ -10,14 +10,17 @@ import {
   MapPin,
   History as HistoryIcon,
   Building,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRoom, useRoomHistory } from "@/hooks/useRooms";
 import { useAuth } from "@/hooks/useAuth";
+import { useHospitalConfig } from "@/hooks/useHospitalConfig";
 import { api, imageUrl, STATUS_LABEL, ScanRecord } from "@/lib/api";
 import { ScoreRing } from "@/components/ScoreRing";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
+import { RoomQRCode } from "@/components/RoomQRCode";
 
 function RoomDetailSkeleton() {
   return (
@@ -37,7 +40,10 @@ export function RoomDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const { config } = useHospitalConfig();
   const isAdmin = session?.role === "admin" || session?.role === "manager";
+
+  const [showQR, setShowQR] = useState(false);
 
   const { data: room, isLoading: roomLoading, isError: roomError } = useRoom(id);
   const { data: history, isLoading: historyLoading } = useRoomHistory(id);
@@ -129,6 +135,9 @@ export function RoomDetailPage() {
         <div className="flex gap-2">
           {isAdmin && (
             <>
+              <Button variant="secondary" size="sm" onClick={() => setShowQR(true)}>
+                <QrCode className="h-3.5 w-3.5" /> QR Code
+              </Button>
               <Link to={`/dashboard/rooms/${id}/edit`}>
                 <Button variant="secondary" size="sm">
                   <Edit2 className="h-3.5 w-3.5" /> Edit
@@ -260,6 +269,19 @@ export function RoomDetailPage() {
           </table>
         </div>
       </div>
+
+      {/* QR Code Modal */}
+      {showQR && room.roomCode && (
+        <RoomQRCode
+          roomCode={room.roomCode}
+          roomName={room.name}
+          block={room.block}
+          floor={room.floor}
+          hospitalName={config.hospitalName}
+          hospitalCode={config.hospitalCode}
+          onClose={() => setShowQR(false)}
+        />
+      )}
     </div>
   );
 }

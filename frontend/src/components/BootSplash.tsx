@@ -25,11 +25,10 @@ export function BootSplash({ message = "Initializing CleanVision...", className 
         className
       )}
     >
-      <div className="relative flex items-center justify-center">
-        {/* Concentric faint rings with breathing pulse */}
-        <div className="absolute h-36 w-36 animate-pulse-subtle rounded-full bg-primary/5 blur-xl" />
-        <div className="absolute h-28 w-28 animate-pulse-subtle rounded-full bg-primary/10 blur-md [animation-delay:1s]" />
-        <div className="absolute h-20 w-20 rounded-full border border-primary/20 bg-primary/5" />
+      <div className="relative flex items-center justify-center h-32 w-32">
+        {/* Concentric rings with breathing pulse (border wave) */}
+        <div className="absolute inset-0 rounded-full border-2 border-primary/40 animate-pulse-subtle" />
+        <div className="absolute inset-0 rounded-full border-2 border-primary/20 animate-pulse-subtle [animation-delay:1s]" />
 
         {/* Central Logo Badge */}
         <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent shadow-raised text-white">

@@ -56,13 +56,17 @@ def init_firebase():
 
 def get_db():
     global _db
-    if _db is None:
-        init_firebase()
-        try:
-            _db = firestore.client()
-        except Exception as e:
-            print(f"[CleanVision Firestore Error] {e}")
-            _db = None
+    if _db is not None:
+        return _db
+    app = init_firebase()
+    if app is None:
+        # No credentials — local fallback mode, don't cache None
+        return None
+    try:
+        _db = firestore.client()
+    except Exception as e:
+        print(f"[CleanVision Firestore Error] {e}")
+        return None
     return _db
 
 def get_bucket():

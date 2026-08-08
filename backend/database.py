@@ -4,10 +4,14 @@ Firestore-backed data access layer for Hospital Config, Public Room Lookup,
 Public Issue Reporting, Rooms, Scans, and Staff Roster.
 """
 
+import os
+import json
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import firebase_config
+
+LOCAL_DB_PATH = os.path.join(os.path.dirname(__file__), "local_db.json")
 
 # Local fallback store if Firestore credentials are missing in local dev
 _in_memory_store = {
@@ -29,7 +33,60 @@ _in_memory_store = {
     "notifications": {}
 }
 
+def _save_local_store():
+    try:
+        with open(LOCAL_DB_PATH, "w", encoding="utf-8") as f:
+            json.dump(_in_memory_store, f, indent=2)
+    except Exception as e:
+        print(f"[CleanVision Local DB Error] Failed to save store: {e}")
+
+def _load_local_store():
+    global _in_memory_store
+    if os.path.exists(LOCAL_DB_PATH):
+        try:
+            with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                _in_memory_store.update(data)
+                print(f"[CleanVision Local DB] Loaded {len(_in_memory_store.get('rooms', {}))} rooms from local_db.json.")
+                return
+        except Exception as e:
+            print(f"[CleanVision Local DB Error] Failed to load local_db.json: {e}")
+
+    # Seed initial demo rooms if file does not exist
+    print("[CleanVision Local DB] Seeding default demo rooms into local database...")
+    demo_rooms = [
+        {"name": "Emergency Ward 101", "block": "Block A", "floor": "Floor 1", "num": "101", "code": "CGH-A-101-A"},
+        {"name": "ICU Ward 2204", "block": "Block B", "floor": "Floor 2", "num": "2204", "code": "CGH-B-2204-B1"},
+        {"name": "General Surgery 302", "block": "Block C", "floor": "Floor 3", "num": "302", "code": "CGH-C-302-C"},
+    ]
+    for r in demo_rooms:
+        r_id = str(uuid.uuid4())
+        room_data = {
+            "id": r_id,
+            "name": r["name"],
+            "block": r["block"],
+            "floor": r["floor"],
+            "roomNumber": r["num"],
+            "roomCode": r["code"],
+            "baselineImagePath": None,
+            "createdAt": datetime.utcnow().isoformat(),
+            "createdBy": "demo-seed",
+        }
+        lookup_data = {
+            "roomCode": r["code"],
+            "roomId": r_id,
+            "block": r["block"],
+            "floor": r["floor"],
+            "roomNumber": r["num"],
+            "hospitalName": "City General Hospital",
+        }
+        _in_memory_store["rooms"][r_id] = room_data
+        _in_memory_store["roomLookup"][r["code"]] = lookup_data
+
+    _save_local_store()
+
 def _get_db():
+    """Return Firestore client, or None in local fallback mode."""
     return firebase_config.get_db()
 
 def init_db():
@@ -38,7 +95,8 @@ def init_db():
     if db:
         print("[CleanVision Database] Firestore connected (Single-Hospital Mode).")
     else:
-        print("[CleanVision Database] Firestore client unavailable — using in-memory store.")
+        _load_local_store()
+        print("[CleanVision Database] Firestore client unavailable — using persistent local JSON database.")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Hospital Config (Singleton: hospitalConfig/main)
@@ -105,6 +163,7 @@ def add_room(name: str, block: str, floor: str = "Floor 1", room_number: str = N
     else:
         _in_memory_store["rooms"][room_id] = room_data
         _in_memory_store["roomLookup"][room_code] = lookup_data
+        _save_local_store()
 
     return room_id, room_code
 

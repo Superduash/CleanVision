@@ -1,12 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export function useRooms(block?: string) {
   return useQuery({
     queryKey: ["rooms", block || "all"],
     queryFn: () => api.listRooms(block),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
     select: (data) => data?.rooms ?? [],
   });
 }
@@ -16,7 +16,8 @@ export function useRoom(roomId: string | number) {
     queryKey: ["room", String(roomId)],
     queryFn: () => api.getRoom(roomId),
     enabled: !!roomId,
-    staleTime: 30_000,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
     select: (data) => data?.room,
   });
 }
@@ -26,8 +27,8 @@ export function useRoomHistory(roomId: string | number) {
     queryKey: ["history", String(roomId)],
     queryFn: () => api.getHistory(roomId),
     enabled: !!roomId,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
     select: (data) => data?.history ?? [],
   });
 }
@@ -36,8 +37,8 @@ export function useSummary() {
   return useQuery({
     queryKey: ["summary"],
     queryFn: () => api.getSummary(),
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -45,7 +46,7 @@ export function useReports(days: number) {
   return useQuery({
     queryKey: ["reports", days],
     queryFn: () => api.getReports(days),
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
